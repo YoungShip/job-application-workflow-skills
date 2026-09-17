@@ -32,6 +32,9 @@ if (-not $python) { throw 'Python is required for the validation scripts.' }
 & $python.Source (Join-Path $Root 'scripts/public-safety-check.py') $Root
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+& $python.Source (Join-Path $Root 'scripts/validate-skill-structure.py') $Root
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 & $python.Source -m unittest discover -s (Join-Path $Root 'skills/campus-recruitment/scripts') -p 'test_*.py'
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 

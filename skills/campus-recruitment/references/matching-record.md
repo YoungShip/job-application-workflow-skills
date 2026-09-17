@@ -65,8 +65,7 @@ The example is fictional and is not a recommendation for a real candidate.
 ## Validation
 
 ```powershell
-python scripts/verify-matching.py path/to/matching.json
+python skills/campus-recruitment/scripts/verify-matching.py path/to/matching.json
 ```
 
 The verifier writes a sibling `*-verification.json` report. It checks structure and file/count consistency; human review is still required for source authenticity and decision quality.
-

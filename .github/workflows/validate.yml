@@ -14,6 +14,7 @@ jobs:
           python-version: '3.x'
       - name: Public safety scan
         run: python scripts/public-safety-check.py .
+      - name: Validate skill structure
+        run: python scripts/validate-skill-structure.py .
       - name: Matching validator tests
         run: python -m unittest discover -s skills/campus-recruitment/scripts -p 'test_*.py'
-

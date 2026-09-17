@@ -20,12 +20,23 @@ docs/
 schemas/                             脱敏示例与接口形状
 scripts/
 ├── public-safety-check.py           发布前个人信息/凭据痕迹扫描
+├── validate-skill-structure.py      Skill frontmatter 与本地引用校验
 └── validate-bundle.ps1              Skill 结构与示例校验入口
 ```
 
 ## 安装为本地 Skills
 
 将 `skills/` 下的三个目录复制到目标 Codex 的 skills 目录即可。三者建议一起安装，因为它们分别负责研究、填表和同步；单独使用时仍应保留相应的本地适配器和档案路径配置。
+
+Windows 示例（把目标路径替换为实际 Codex skills 目录）：
+
+```powershell
+Copy-Item -Recurse -Force skills/campus-recruitment <skills-root>/campus-recruitment
+Copy-Item -Recurse -Force skills/job-application-form-filling <skills-root>/job-application-form-filling
+Copy-Item -Recurse -Force skills/offernotes-sync <skills-root>/offernotes-sync
+```
+
+只复制 `skills/` 下的三个目录；`docs/`、`schemas/` 和 `scripts/` 是维护与验证材料，不是候选人资料。
 
 每次使用时只读取当前任务需要的参考资料：
 
@@ -46,13 +57,13 @@ scripts/
 ## 发布前检查
 
 ```powershell
-python scripts/public-safety-check.py .
-powershell -ExecutionPolicy Bypass -File scripts/validate-bundle.ps1
+python -X utf8 scripts/public-safety-check.py .
+python -X utf8 scripts/validate-skill-structure.py .
+pwsh -NoLogo -NoProfile -NonInteractive -File scripts/validate-bundle.ps1
 ```
 
-检查通过只说明仓库没有命中常见个人信息/凭据模式，不代表人工审查可以省略。
+检查通过只说明仓库没有命中常见个人信息/凭据模式，且结构与离线交接契约成立，不代表人工审查或真实线上读回可以省略。完整说明见 [docs/test-plan.md](docs/test-plan.md)。
 
 ## 许可
 
 除非另有声明，本仓库中的流程文字和示例按 MIT License 发布。使用者必须自行遵守目标招聘网站、浏览器工具和当地隐私/数据保护要求。
-

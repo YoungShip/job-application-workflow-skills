@@ -18,6 +18,10 @@
 - 同步脚本在页面函数闭包内执行；认证对象不返回到 shell、日志或文件。
 - CDP 仅限在线进度同步和只读诊断，不用于网申填表或最终投递。
 
+## Independent browser profile trap
+
+独立的浏览器自动化 profile 没有用户日常会话的登录态，可能返回 403、空 localStorage 或“登录失效”。这不能证明用户账号失效，也不能通过反复新建实例猜测登录。改用已登录的会话浏览器；若任务确实是允许的在线同步，再使用专用、非默认、已验证登录的 profile。
+
 ## Scoped sync
 
 payload 只包含本轮授权和已核实的 entries，但 identity index 应保留所有已绑定岗位。这样批量分割不会把缺席本批的岗位误认成新岗位。同步结果逐条记录 action/error；一条失败不能被整批成功状态掩盖。
@@ -37,4 +41,3 @@ payload 只包含本轮授权和已核实的 entries，但 identity index 应保
 ## Delete boundary
 
 常规 reconcile 只创建和更新，不包含删除。删除线上记录仅在用户明确要求时进行：先 GET 详情确认当前用户和管理区 job ID，再逐个删除关联阶段，删除记录后读回 404/总数变化。任何归属不匹配都应中止。
-

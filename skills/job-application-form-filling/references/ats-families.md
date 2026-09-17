@@ -33,13 +33,13 @@ preferences: city, salary, interview, availability
 ### Feishu-style forms
 
 - 登录常见手机号、滑块和短信验证码；验证码/滑块由用户处理。
-- 常见自定义表单项和月粒度日期控件；教育年份、项目日期、角色和描述容易在简历解析后错位。
+- 常见自定义表单项（例如 `ud__`、`.ud-formily-item`）和月粒度日期控件；教育年份、项目日期、角色和描述容易在简历解析后错位。
 - 解析后优先检查所有 textarea、教育时间和项目链接，不要只看首屏。
 - 同一账号的后续岗位是否复用资料必须按当前站点实测；不要默认复用或默认清空。
 
 ### Moka/SugarDesign
 
-- 常见字段容器带 `apply-field`/`apply-block` 特征；下拉显示值可能在展示 span 中，input.value 为空。
+- 常见字段容器带 `sd-`、`apply-field`/`apply-block` 特征，字段类型可能包含字符串、select、日期、地点和多记录区块；下拉显示值可能在展示 span 中，input.value 为空。
 - 受控文本组件有时需要真实 focus、全选和输入事件，单纯改 DOM value 可能不落库。
 - 教育/实习/项目日期常为年/月下拉；出生日期可能是只读输入+日历弹层，必要时交给用户手点。
 - 籍贯/地区 tag-input、内层滚动容器和 React 按钮是常见坑位；必须以视觉/DOM 读回为准。
@@ -47,7 +47,7 @@ preferences: city, salary, interview, availability
 
 ### Zhiye/Phoenix-style forms
 
-- 常见四步：基本信息、履历、附件、预览/提交；教育、实习和项目可能在弹窗中逐条添加。
+- 常见四步：基本信息、履历、附件、预览/提交；路由可能经过 `ResumeImport` → `ResumeItem`，教育、实习和项目可能在弹窗中逐条添加。
 - 原生 select、jQuery/自定义弹窗并存；修改后需触发页面的 change/blur 校验。
 - 手机号、邮箱等字段可能被异步脚本清空，写入后应立即读回。
 - 提交前真实性声明、验证码和最终按钮属于外部副作用边界。
@@ -59,4 +59,3 @@ preferences: city, salary, interview, availability
 ## Update rule
 
 新站点先记实际观察和验证范围；跨站点或多次独立验证后，才把共性提炼到本文件。站点特有选择器留在 `site-knowledge.md`。
-

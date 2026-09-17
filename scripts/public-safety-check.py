@@ -15,6 +15,12 @@ from pathlib import Path
 SKIP_DIRS = {".git", "node_modules", "__pycache__", ".pytest_cache"}
 FORBIDDEN_NAME_PARTS = {
     "private",
+    "data",
+    "tmp",
+    "output",
+    "outputs",
+    "snapshots",
+    "artifacts",
     "browser-profile",
     "chrome-profile",
     "cookies",
@@ -23,6 +29,7 @@ FORBIDDEN_NAME_PARTS = {
 
 EMAIL = re.compile(r"(?<![\w.+-])[\w.+-]+@[\w-]+(?:\.[\w-]+)+(?![\w.-])")
 PHONE = re.compile(r"(?<!\d)(?:\+?86[ -]?)?1[3-9]\d{9}(?!\d)")
+NATIONAL_ID = re.compile(r"(?<!\d)(?:\d{17}[0-9Xx])(?!\d)")
 # Build the Unix fragment in pieces so the scanner does not flag its own
 # detection pattern as a leaked path.
 WINDOWS_PERSONAL_PATH = re.compile(
@@ -61,6 +68,7 @@ def main() -> int:
         for label, pattern in (
             ("email-like value", EMAIL),
             ("phone-like value", PHONE),
+            ("national-id-like value", NATIONAL_ID),
             ("personal absolute path", WINDOWS_PERSONAL_PATH),
             ("JWT-like token", JWT),
             ("secret assignment", SECRET_ASSIGNMENT),

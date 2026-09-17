@@ -76,6 +76,19 @@ job_url                         → application-stage todo link
 
 阶段编号和状态应由适配器配置；常见约定是 `0 application, 1 assessment, 2 first interview, 3 second interview, 4 later interview, 5 offer`。待办、已完成待结果、通过、拒绝、放弃和无需后续反馈必须区分。某轮通过不等于获得 Offer；普通提醒不自动创建招聘阶段。
 
+若目标服务采用数字阶段状态，可按事实映射而不是按本地文字猜测：
+
+| 已核实事实 | 常见线上状态 |
+|---|---|
+| 已选定待投或收到安排但尚未完成 | 待办 |
+| 投递/测评/面试已完成，等待结果 | 待通知 |
+| 明确通过本环节 | 通过 |
+| 明确被拒 | 被拒 |
+| 本人明确放弃 | 放弃 |
+| 已完成且无需后续反馈 | 已办 |
+
+服务若使用不同编码，保留其官方/适配器映射；不要把“已提交”直接改写成“已通过”。
+
 ## Failure and closeout
 
 - 登录失效或浏览器不可用：停止写入并保留 pending/error；
@@ -89,4 +102,3 @@ job_url                         → application-stage todo link
 
 - 可复用故障和安全经验：[sync-knowledge.md](references/sync-knowledge.md)
 - 适配器输入输出：[online-adapter.md](references/online-adapter.md)
-
