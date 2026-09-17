@@ -13,6 +13,8 @@
 - 记录了届别、校招性质和过滤范围；
 - 若使用关键词，报告明确标为“非全量”。
 
+写入 schema v2 时，`raw_catalog` 必须显式声明 `format` 和岗位 ID 提取方式：JSON 使用 `records_path` + `id_path`，CSV/TSV 使用 `id_column`。提取不到稳定 ID 就标记覆盖待核验，不退回到标题模糊匹配。
+
 ## Acquisition layers
 
 ### Layer 1: public API or embedded data
@@ -70,3 +72,4 @@ research/<company-key>-<run-id>/
 
 目录名和文件内容不得包含候选人敏感字段；真实快照放在私有目录并由版本控制排除。
 
+`coverage.capture_status` 区分 `complete`/`partial`/`unknown`；即使 ID 和数量与快照一致，也只能证明与该快照一致，不能自动证明官网已经抓全。完整声明需要官方总数、最后一页/API 穷尽证据和人工确认。

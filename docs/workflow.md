@@ -17,12 +17,13 @@
 2. 定位官方校招入口，区分校招、社招、实习和不同招聘主体。
 3. 获取完整岗位目录，保存原始快照；不要用首页第一屏或关键词结果冒充全量。
 4. 逐个阅读范围内岗位的完整 JD，记录至少两条原文引文、硬门槛、匹配点和缺口。
-5. 运行 `verify-matching.py`，通过后才生成比较记录或登记新岗位。
-6. 将首选和替代岗位交给用户确认；有限志愿、顺序、投后修改限制和截止日必须显著呈现。
+5. 按 schema v2 保存 `raw_catalog` 的显式 ID 提取规则和 `coverage` 状态；每个范围内岗位保存共享 JD/候选人来源，并用 `requirements[]` 做逐项映射。
+6. 运行 `verify-matching.py`，按 `checks`、`positions[]` 和 `readiness` 判断是否可以生成比较记录或登记新岗位；不要只看 `passed`。
+7. 将首选和替代岗位交给用户确认；有限志愿、顺序、投后修改限制和截止日必须显著呈现。
 
 ## 3. 登记本地投递主表
 
-选定岗位后按主表适配器执行：
+选定岗位且 matching 报告具备登记条件后按主表适配器执行：
 
 ```text
 snapshot → plan → preview → apply → snapshot/read-back → validate
@@ -74,4 +75,3 @@ snapshot → plan → preview → apply → snapshot/read-back → validate
 ## 8. 收尾
 
 最终报告区分：研究完成、已登记待投、已提交、线上已同步、待用户操作、待核实和失败保留项。不能用预览成功、导出成功或启动浏览器来代替线上成功凭据。
-

@@ -2,6 +2,8 @@
 
 The Skill is independent of any particular CSV implementation. A local adapter must expose equivalent operations and preserve optimistic concurrency.
 
+Before registering a newly researched role, the caller should require the matching report to say `readiness.can_register_selected_position=true` and still obtain the user's explicit role selection. A report may contain verified individual positions while the overall directory is partial; those positions can be displayed, but they must not be treated as a complete research batch.
+
 ## Read and write sequence
 
 ```text
@@ -52,4 +54,3 @@ Offer     explicit offer evidence
 ```
 
 Do not infer status from a plan date, page visit, or a generic reminder.
-

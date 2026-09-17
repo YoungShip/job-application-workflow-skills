@@ -35,7 +35,13 @@ if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 & $python.Source (Join-Path $Root 'scripts/validate-skill-structure.py') $Root
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+& $python.Source -X utf8 -m json.tool (Join-Path $Root 'schemas/matching-v2.schema.json') | Out-Null
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
 & $python.Source -m unittest discover -s (Join-Path $Root 'skills/campus-recruitment/scripts') -p 'test_*.py'
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+& $python.Source -X utf8 (Join-Path $Root 'skills/campus-recruitment/scripts/verify-matching.py') (Join-Path $Root 'examples/vla-evidence/matching.json')
 if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
 Write-Output 'validate-bundle: passed'

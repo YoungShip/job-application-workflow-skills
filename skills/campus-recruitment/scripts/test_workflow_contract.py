@@ -15,6 +15,8 @@ import unittest
 from pathlib import Path
 from typing import Any
 
+from test_verify_matching import valid_record
+
 
 ROOT = Path(__file__).resolve().parents[3]
 MATCHING_VALIDATOR = Path(__file__).with_name("verify-matching.py")
@@ -121,35 +123,17 @@ class WorkflowContractTests(unittest.TestCase):
     def test_happy_path_across_all_stages(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            (root / "catalog.json").write_text(
-                json.dumps([{"id": "role-1", "title": "Fixture Role", "city": "Fixture City"}]),
-                encoding="utf-8",
-            )
-            matching = {
-                "company": "Fixture Company",
-                "date": "2026-01-01",
-                "scope": "fixture only",
-                "raw_catalog": {"file": "catalog.json", "total_positions": 1},
-                "catalog_index": [{"id": "role-1", "title": "Fixture Role", "city": "Fixture City", "in_scope": True}],
-                "positions": [{
-                    "id": "role-1",
-                    "jd_evidence": ["Build automated checks.", "Investigate failures."],
-                    "grade": "A",
-                    "coverage_estimate": "60% (fixture)",
-                    "resume_version": "fixture-version",
-                    "match_reasons": "Fixture evidence only.",
-                    "gaps": "Fixture gap only.",
-                }],
-            }
+            matching = valid_record(root)
             matching_path = root / "matching.json"
-            matching_path.write_text(json.dumps(matching), encoding="utf-8")
+            matching_path.write_text(json.dumps(matching, ensure_ascii=False), encoding="utf-8")
             process = subprocess.run(
-                [sys.executable, str(MATCHING_VALIDATOR), str(matching_path)],
+                [sys.executable, "-X", "utf8", str(MATCHING_VALIDATOR), str(matching_path)],
                 capture_output=True,
-                text=True,
-                encoding="utf-8",
             )
-            self.assertEqual(process.returncode, 0, process.stdout + process.stderr)
+            output = process.stdout.decode("utf-8", errors="replace") + process.stderr.decode("utf-8", errors="replace")
+            self.assertEqual(process.returncode, 0, output)
+            report = json.loads(process.stdout.decode("utf-8"))
+            self.assertTrue(report["readiness"]["can_register_selected_position"])
 
             plan = {
                 "expected_revision": "fixture-revision-1",

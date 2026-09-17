@@ -8,7 +8,7 @@
 - cross-skill handoff contract: matching → tracker plan → sensitive-field audit → sync payload → revision ack;
 - negative cases for duplicate IDs, raw sensitive values, invalid statuses and stale acknowledgements.
 
-当前本地回归共 6 个用例，另有 PowerShell 7 入口会串行执行安全扫描、结构检查和同一组 Python 测试。
+当前本地回归共 23 个用例，另有 PowerShell 7 入口会串行执行安全扫描、结构检查和同一组 Python 测试。
 
 ## What is intentionally not run in CI
 

@@ -16,8 +16,10 @@ skills/
 docs/
 ├── workflow.md                      跨 Skill 的端到端工作流
 ├── privacy.md                       脱敏、权限与凭据边界
+├── migration.md                     旧 matching 记录与调用方迁移说明
 └── model-routing.md                 可选的模型分工建议
-schemas/                             脱敏示例与接口形状
+schemas/                             脱敏示例、matching v2 schema 与接口形状
+examples/vla-evidence/               VLA 训练/推理语义边界的虚构匹配示例
 scripts/
 ├── public-safety-check.py           发布前个人信息/凭据痕迹扫描
 ├── validate-skill-structure.py      Skill frontmatter 与本地引用校验
@@ -36,7 +38,7 @@ Copy-Item -Recurse -Force skills/job-application-form-filling <skills-root>/job-
 Copy-Item -Recurse -Force skills/offernotes-sync <skills-root>/offernotes-sync
 ```
 
-只复制 `skills/` 下的三个目录；`docs/`、`schemas/` 和 `scripts/` 是维护与验证材料，不是候选人资料。
+只复制 `skills/` 下的三个目录；`docs/`、`schemas/` 和 `scripts/` 是维护与验证材料，不是候选人资料。迁移现有旧记录前请先看 [docs/migration.md](docs/migration.md)。
 
 每次使用时只读取当前任务需要的参考资料：
 
@@ -62,7 +64,7 @@ python -X utf8 scripts/validate-skill-structure.py .
 pwsh -NoLogo -NoProfile -NonInteractive -File scripts/validate-bundle.ps1
 ```
 
-检查通过只说明仓库没有命中常见个人信息/凭据模式，且结构与离线交接契约成立，不代表人工审查或真实线上读回可以省略。完整说明见 [docs/test-plan.md](docs/test-plan.md)。
+检查通过只说明仓库没有命中常见个人信息/凭据模式，且结构与离线交接契约成立，不代表人工审查或真实线上读回可以省略。可运行的虚构证据示例见 [examples/vla-evidence/matching.json](examples/vla-evidence/matching.json)，完整说明见 [docs/test-plan.md](docs/test-plan.md)。
 
 ## 许可
 

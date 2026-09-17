@@ -16,5 +16,9 @@ jobs:
         run: python scripts/public-safety-check.py .
       - name: Validate skill structure
         run: python scripts/validate-skill-structure.py .
+      - name: Validate matching schema JSON
+        run: python -m json.tool schemas/matching-v2.schema.json > /dev/null
       - name: Matching validator tests
         run: python -m unittest discover -s skills/campus-recruitment/scripts -p 'test_*.py'
+      - name: Validate fictional evidence example
+        run: python -X utf8 skills/campus-recruitment/scripts/verify-matching.py examples/vla-evidence/matching.json
