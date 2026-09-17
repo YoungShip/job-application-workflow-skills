@@ -1,0 +1,19 @@
+name: validate
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.x'
+      - name: Public safety scan
+        run: python scripts/public-safety-check.py .
+      - name: Matching validator tests
+        run: python -m unittest discover -s skills/campus-recruitment/scripts -p 'test_*.py'
+

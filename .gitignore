@@ -1,0 +1,55 @@
+# Candidate-specific data and local state
+.env
+.env.*
+!.env.example
+private/
+data/
+tmp/
+output/
+outputs/
+snapshots/
+artifacts/
+profiles/
+browser-profile/
+chrome-profile/
+
+# Application records and source materials
+*.csv
+*.tsv
+*.xlsx
+*.xls
+*.pdf
+*.doc
+*.docx
+*.png
+*.jpg
+*.jpeg
+*.webp
+*resume*
+*cv*
+*cover-letter*
+*application-log*
+*submission*
+*payload*
+*result*
+*cookie*
+*token*
+
+# Runtime and generated files
+__pycache__/
+*.py[cod]
+*.log
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+node_modules/
+dist/
+build/
+
+# Local editor / OS files
+.idea/
+.vscode/
+*.swp
+.DS_Store
+Thumbs.db
+
