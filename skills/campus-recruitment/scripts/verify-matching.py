@@ -525,6 +525,89 @@ def summary(requirements: list[dict[str, Any]]) -> dict[str, int]:
     }
 
 
+def evaluate_decision_policy(requirements: list[Any], state: Any, position_id: str, issues: Issues) -> dict[str, Any]:
+    """Apply the finite decision-state policy once for a multi-requirement role."""
+    hard_pending = any(
+        item.get("category") == "hard_qualification" and item.get("conclusion") == "pending"
+        for item in requirements if isinstance(item, dict)
+    )
+    hard_failed = any(
+        item.get("category") == "hard_qualification" and item.get("conclusion") == "not_satisfied"
+        for item in requirements if isinstance(item, dict)
+    )
+    core_failed = any(
+        type(item.get("category")) is str
+        and item.get("category") in {"hard_qualification", "core_capability"}
+        and item.get("conclusion") == "not_satisfied"
+        for item in requirements if isinstance(item, dict)
+    )
+    core_pending_items = [
+        item for item in requirements
+        if isinstance(item, dict)
+        and type(item.get("category")) is str
+        and item.get("category") in {"hard_qualification", "core_capability"}
+        and item.get("conclusion") == "pending"
+    ]
+    core_pending_supports = [item.get("support") for item in core_pending_items]
+    core_pending = bool(core_pending_items)
+    direct_core = any(
+        type(item.get("category")) is str
+        and item.get("category") in {"hard_qualification", "core_capability"}
+        and item.get("support") == "direct_support"
+        for item in requirements if isinstance(item, dict)
+    )
+    state_valid = type(state) is str and state in DECISIONS
+    if state == "recommended" and (hard_pending or hard_failed or core_failed or core_pending or not direct_core):
+        issues.add(
+            "RECOMMENDATION_NOT_SUPPORTED", "decision_consistency",
+            "recommended 不能含待确认/失败的硬/核心要求，且需至少一项直接支持证据",
+            "改为 pending/consider/excluded，或补齐并核实逐项证据",
+            path="positions[].decision.state", position_id=position_id,
+        )
+    if state_valid and state in {"recommended", "consider"} and (hard_pending or hard_failed):
+        issues.add(
+            "HARD_QUALIFICATION_UNRESOLVED", "decision_consistency",
+            "硬资格待确认/不满足时不能进入推荐或考虑",
+            "保持 pending 或 excluded，先核实硬资格",
+            path="positions[].decision.state", position_id=position_id,
+        )
+    if state == "consider" and (
+        hard_pending
+        or hard_failed
+        or core_failed
+        or not core_pending_items
+        or any(support != "transferable" for support in core_pending_supports)
+    ):
+        issues.add(
+            "DECISION_STATE_MISMATCH", "decision_consistency",
+            "consider 只适用于硬资格已满足且所有核心缺口均为 transferable + pending",
+            "核心明确不满足、无证据或冲突保持 pending；没有核心待确认项不能标 consider",
+            path="positions[].decision.state", position_id=position_id,
+        )
+    if state == "pending":
+        unresolved = hard_pending or hard_failed or core_failed or core_pending
+        if not unresolved or (
+            not hard_pending
+            and not hard_failed
+            and not core_failed
+            and core_pending_items
+            and all(support == "transferable" for support in core_pending_supports)
+        ):
+            issues.add(
+                "DECISION_STATE_MISMATCH", "decision_consistency",
+                "pending 只用于保留未解决事实；硬资格待确认可 pending，核心全为可迁移待确认时应 consider",
+                "按要求结果选择 pending 或 consider；不要用标签改变登记许可",
+                path="positions[].decision.state", position_id=position_id,
+            )
+    return {
+        "hard_pending": hard_pending,
+        "hard_failed": hard_failed,
+        "core_failed": core_failed,
+        "core_pending": core_pending,
+        "direct_core": direct_core,
+    }
+
+
 def validate_position(position: Any, catalog_entry: dict[str, Any] | None, base: Path, issues: Issues) -> dict[str, Any]:
     position_id = canon_id(position.get("id")) if isinstance(position, dict) else None
     position_id = position_id or "<missing-id>"
@@ -753,46 +836,12 @@ def validate_position(position: Any, catalog_entry: dict[str, Any] | None, base:
                     path=f"positions[].requirement_summary.{field}", position_id=position_id,
                 )
 
-    hard_pending = any(item.get("category") == "hard_qualification" and item.get("conclusion") == "pending" for item in requirements if isinstance(item, dict))
-    hard_failed = any(item.get("category") == "hard_qualification" and item.get("conclusion") == "not_satisfied" for item in requirements if isinstance(item, dict))
-    core_failed = any(type(item.get("category")) is str and item.get("category") in {"hard_qualification", "core_capability"} and item.get("conclusion") == "not_satisfied" for item in requirements if isinstance(item, dict))
-    core_pending = any(type(item.get("category")) is str and item.get("category") in {"hard_qualification", "core_capability"} and item.get("conclusion") == "pending" for item in requirements if isinstance(item, dict))
-    direct_core = any(type(item.get("category")) is str and item.get("category") in {"hard_qualification", "core_capability"} and item.get("support") == "direct_support" for item in requirements if isinstance(item, dict))
-    core_pending_items = [
-        item for item in requirements
-        if isinstance(item, dict)
-        and type(item.get("category")) is str
-        and item.get("category") in {"hard_qualification", "core_capability"}
-        and item.get("conclusion") == "pending"
-    ]
-    core_pending_supports = [item.get("support") for item in core_pending_items]
-    if state == "recommended" and (hard_pending or hard_failed or core_failed or core_pending or not direct_core):
-        issues.add(
-            "RECOMMENDATION_NOT_SUPPORTED", "decision_consistency", "recommended 不能含待确认/失败的硬/核心要求，且需直接支持证据",
-            "改为 consider/pending/excluded，或补齐并核实逐项证据",
-            path="positions[].decision.state", position_id=position_id,
-        )
-    if state_valid and state in {"recommended", "consider"} and (hard_pending or hard_failed):
-        issues.add(
-            "HARD_QUALIFICATION_UNRESOLVED", "decision_consistency", "硬资格待确认/不满足时不能进入推荐或考虑",
-            "保持 pending 或 excluded，先核实硬资格",
-            path="positions[].decision.state", position_id=position_id,
-        )
-    if state == "consider":
-        if core_failed or not core_pending_items or any(support != "transferable" for support in core_pending_supports):
-            issues.add(
-                "DECISION_STATE_MISMATCH", "decision_consistency",
-                "consider 只适用于硬资格已满足且所有核心缺口均为可迁移但未定论的证据",
-                "核心明确不满足、无证据或冲突保持 pending；没有核心待确认项不能标 consider",
-                path="positions[].decision.state", position_id=position_id,
-            )
-    elif state == "pending" and not core_failed and core_pending_items and all(support == "transferable" for support in core_pending_supports):
-        issues.add(
-            "DECISION_STATE_MISMATCH", "decision_consistency",
-            "核心能力只有可迁移证据时应使用 consider，不能用 pending 获得不同登记权限",
-            "若允许用户尝试性申请，改为 consider；若无可迁移证据则保持 pending",
-            path="positions[].decision.state", position_id=position_id,
-        )
+    policy = evaluate_decision_policy(requirements, state, position_id, issues)
+    hard_pending = policy["hard_pending"]
+    hard_failed = policy["hard_failed"]
+    core_failed = policy["core_failed"]
+    core_pending = policy["core_pending"]
+    direct_core = policy["direct_core"]
     grade = position.get("grade")
     if "grade" in position and (type(grade) is not str or grade not in GRADES):
         issues.add(

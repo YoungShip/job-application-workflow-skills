@@ -12,6 +12,36 @@ from typing import Any
 
 SCRIPT = Path(__file__).with_name("verify-matching.py")
 
+ALLOWED_SUPPORT_CONCLUSIONS = (
+    ("direct_support", "satisfied"),
+    ("direct_support", "pending"),
+    ("transferable", "pending"),
+    ("no_evidence", "pending"),
+    ("conflict", "pending"),
+    ("conflict", "not_satisfied"),
+)
+
+
+def expected_decision_for_combination(hard, core_a, core_b):
+    """Independent test contract; deliberately does not call production code."""
+    hard_pending = hard == ("transferable", "pending") or hard == ("direct_support", "pending") or hard == ("no_evidence", "pending") or hard == ("conflict", "pending")
+    hard_failed = hard == ("conflict", "not_satisfied")
+    cores = (core_a, core_b)
+    core_failed = any(support == "conflict" and conclusion == "not_satisfied" for support, conclusion in cores)
+    core_pending = [pair for pair in cores if pair[1] == "pending"]
+    if hard == ("direct_support", "satisfied") and all(pair == ("direct_support", "satisfied") for pair in cores):
+        return "recommended"
+    if not hard_pending and not hard_failed and not core_failed and core_pending and all(support == "transferable" for support, _ in core_pending):
+        return "consider"
+    return "pending"
+
+
+def apply_requirement_pair(requirement, pair, evidence_id):
+    support, conclusion = pair
+    requirement["support"] = support
+    requirement["conclusion"] = conclusion
+    requirement["candidate_evidence_ids"] = [] if support == "no_evidence" else [evidence_id]
+
 
 class Fixture:
     """Temporary directory plus its mutable JSON record."""
@@ -328,6 +358,86 @@ class MatchingValidatorTests(unittest.TestCase):
         report = run_validator(root, 1)
         self.assertTrue(any(issue["code"] == "HARD_QUALIFICATION_UNRESOLVED" for issue in report["issues"]))
         self.assertFalse(report["readiness"]["can_register_selected_position"])
+
+    def test_finite_state_combinations_cover_three_role_states(self):
+        """Enumerate contract pairs; expected states are test-owned, not production-derived."""
+        cases = []
+        # Each requirement role receives every allowed support/conclusion pair
+        # while the other two roles remain a complete, legal baseline.
+        for index in range(3):
+            for pair in ALLOWED_SUPPORT_CONCLUSIONS:
+                values = [("direct_support", "satisfied")] * 3
+                values[index] = pair
+                cases.append((f"role-{index}-{pair[0]}-{pair[1]}", tuple(values)))
+        # Explicit multi-core combinations exercise non-cancellation.
+        cases.extend([
+            ("core-conflict-plus-transferable", (("direct_support", "satisfied"), ("conflict", "not_satisfied"), ("transferable", "pending"))),
+            ("core-no-evidence-plus-conflict", (("direct_support", "satisfied"), ("no_evidence", "pending"), ("conflict", "pending"))),
+            ("core-transferable-plus-transferable", (("direct_support", "satisfied"), ("transferable", "pending"), ("transferable", "pending"))),
+        ])
+        for label, (hard_pair, core_a_pair, core_b_pair) in cases:
+            expected = expected_decision_for_combination(hard_pair, core_a_pair, core_b_pair)
+            for state in ("pending", "consider", "recommended"):
+                with self.subTest(label=label, state=state):
+                    root = self.with_record()
+                    position = root.record["positions"][0]
+                    position["requirements"][1]["category"] = "core_capability"
+                    position["requirements"][2]["category"] = "core_capability"
+                    apply_requirement_pair(position["requirements"][0], hard_pair, "ev-1")
+                    apply_requirement_pair(position["requirements"][1], core_a_pair, "ev-2")
+                    apply_requirement_pair(position["requirements"][2], core_b_pair, "ev-2")
+                    position["requirement_summary"] = summary_for(position["requirements"])
+                    position["decision"]["state"] = state
+                    report = run_validator(root, 0 if state == expected else 1)
+                    if state == expected:
+                        self.assertEqual(report["positions"][0]["status"], "verified")
+                        self.assertEqual(report["readiness"]["can_register_selected_position"], state in {"recommended", "consider"})
+
+    def test_requirement_order_does_not_change_decision_or_permission(self):
+        root = self.with_record()
+        position = root.record["positions"][0]
+        position["requirements"][1]["category"] = "core_capability"
+        position["requirements"][2]["category"] = "core_capability"
+        for requirement, pair, evidence_id in zip(
+            position["requirements"],
+            (("direct_support", "satisfied"), ("conflict", "not_satisfied"), ("transferable", "pending")),
+            ("ev-1", "ev-2", "ev-2"),
+        ):
+            apply_requirement_pair(requirement, pair, evidence_id)
+        position["requirement_summary"] = summary_for(position["requirements"])
+        position["decision"]["state"] = "pending"
+        before = run_validator(root, 0)
+        position["requirements"] = list(reversed(position["requirements"]))
+        position["requirement_summary"] = summary_for(position["requirements"])
+        after = run_validator(root, 0)
+        self.assertEqual(before["positions"][0]["status"], after["positions"][0]["status"])
+        self.assertEqual(before["readiness"]["can_register_selected_position"], after["readiness"]["can_register_selected_position"])
+
+    def test_adding_adverse_core_evidence_cannot_raise_permission(self):
+        root = self.with_record()
+        position = root.record["positions"][0]
+        position["requirements"][1]["category"] = "core_capability"
+        position["requirements"][2]["category"] = "core_capability"
+        for requirement, pair, evidence_id in zip(
+            position["requirements"],
+            (("direct_support", "satisfied"), ("transferable", "pending"), ("direct_support", "satisfied")),
+            ("ev-1", "ev-2", "ev-2"),
+        ):
+            apply_requirement_pair(requirement, pair, evidence_id)
+        position["requirement_summary"] = summary_for(position["requirements"])
+        position["decision"]["state"] = "consider"
+        before = run_validator(root, 0)
+        self.assertTrue(before["readiness"]["can_register_selected_position"])
+        adverse = dict(position["requirements"][2])
+        adverse["requirement_id"] = "role-1-adverse"
+        adverse["support"] = "conflict"
+        adverse["conclusion"] = "not_satisfied"
+        adverse["candidate_evidence_ids"] = ["ev-2"]
+        position["requirements"].append(adverse)
+        position["requirement_summary"] = summary_for(position["requirements"])
+        after = run_validator(root, 1)
+        self.assertFalse(after["readiness"]["can_register_selected_position"])
+
 
     def test_invalid_enum_types_return_structured_reports(self):
         invalid_values = [[], {}, 1, True, None]
