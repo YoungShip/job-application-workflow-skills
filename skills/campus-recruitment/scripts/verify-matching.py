@@ -779,14 +779,14 @@ def validate_position(position: Any, catalog_entry: dict[str, Any] | None, base:
             path="positions[].decision.state", position_id=position_id,
         )
     if state == "consider":
-        if not core_pending_items or any(support != "transferable" for support in core_pending_supports):
+        if core_failed or not core_pending_items or any(support != "transferable" for support in core_pending_supports):
             issues.add(
                 "DECISION_STATE_MISMATCH", "decision_consistency",
-                "consider 只适用于硬资格已满足且核心能力存在可迁移但未定论的证据",
-                "核心无证据/冲突保持 pending；没有核心待确认项不能标 consider",
+                "consider 只适用于硬资格已满足且所有核心缺口均为可迁移但未定论的证据",
+                "核心明确不满足、无证据或冲突保持 pending；没有核心待确认项不能标 consider",
                 path="positions[].decision.state", position_id=position_id,
             )
-    elif state == "pending" and core_pending_items and all(support == "transferable" for support in core_pending_supports):
+    elif state == "pending" and not core_failed and core_pending_items and all(support == "transferable" for support in core_pending_supports):
         issues.add(
             "DECISION_STATE_MISMATCH", "decision_consistency",
             "核心能力只有可迁移证据时应使用 consider，不能用 pending 获得不同登记权限",

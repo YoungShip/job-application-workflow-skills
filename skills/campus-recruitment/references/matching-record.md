@@ -188,6 +188,8 @@ positions[]
 - `excluded`：有明确可追溯排除依据；
 - `not_applicable`：仅用于范围外解释记录。
 
+多要求组合按以下优先级处理：先检查硬资格；硬资格 `pending/not_satisfied` 时不能 `recommended/consider`。再检查核心要求：任一核心 `not_satisfied` 或 `conflict` 时，`pending` 可以如实保存但不可登记，`consider`/`recommended` 均阻断；只有硬资格已满足、核心缺口全部是 `transferable + pending` 时，才允许 `consider` 进入用户复核后的尝试性登记。`no_evidence` 或 `conflict` 不能被另一项可迁移证据抵消。
+
 S/A/B/C 不是新格式的必填字段。若保留：S 要求硬/核心全部 satisfied 且有直接支持；A 不得有硬资格待确认/不满足或核心明确不满足；B 不能直接标 `recommended`；C 必须有硬/核心待确认或明确不满足依据。等级仍是辅助标签，不替代逐项汇总。
 
 ## 7. Report semantics

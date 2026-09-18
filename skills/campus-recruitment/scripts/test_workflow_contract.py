@@ -134,10 +134,12 @@ class WorkflowContractTests(unittest.TestCase):
             self.assertEqual(process.returncode, 0, output)
             report = json.loads(process.stdout.decode("utf-8"))
             self.assertTrue(report["readiness"]["can_register_selected_position"])
+            selected_id = report["readiness"]["selected_position_id"]
+            self.assertIn(selected_id, report["readiness"]["registerable_position_ids"])
 
             plan = {
                 "expected_revision": "fixture-revision-1",
-                "operations": [{"type": "job.patch", "job_id": "job-example-001", "patch": {"status": "Pending"}}],
+                "operations": [{"type": "job.patch", "job_id": selected_id, "patch": {"status": "Pending"}}],
             }
             self.assertEqual(validate_tracker_plan(plan), [])
 
@@ -153,13 +155,13 @@ class WorkflowContractTests(unittest.TestCase):
 
             payload = {
                 "dryRun": True,
-                "entries": [{"job_id": "job-example-001", "company": "Fixture Company"}],
-                "identity_index": [{"job_id": "job-example-001", "online_record_id": None}],
+                "entries": [{"job_id": selected_id, "company": "Fixture Company"}],
+                "identity_index": [{"job_id": selected_id, "online_record_id": None}],
             }
             self.assertEqual(validate_sync_payload(payload), [])
 
-            results = [{"job_id": "job-example-001", "verified": True, "change_id": "change-1", "error": None}]
-            self.assertEqual(validate_ack(results, {"job-example-001": "change-1"}), [])
+            results = [{"job_id": selected_id, "verified": True, "change_id": "change-1", "error": None}]
+            self.assertEqual(validate_ack(results, {selected_id: "change-1"}), [])
 
     def test_rejects_sensitive_leak_and_duplicate_identity(self):
         audit = {"fields": [{"label": "phone", "sensitive": True, "matches": True, "value": "raw-value"}]}

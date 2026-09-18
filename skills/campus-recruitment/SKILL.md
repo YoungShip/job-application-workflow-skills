@@ -20,6 +20,7 @@ metadata:
 7. 新研究岗位须经用户选定，并且 `matching.json` 验证通过后，才登记为待投。
 8. 原始目录身份和证据引用必须使用显式、稳定的字符串 ID；校验器报告为 `invalid` 或 `unverifiable` 时，只能展示已核实岗位，不能宣称全量完成。
 9. 主表登记必须把用户选中的稳定岗位 ID传给匹配复核，并确认该 ID 位于 `readiness.registerable_position_ids`；不能只检查全局 `can_register_selected_position`。
+10. 多要求岗位先按硬资格、核心缺口和支持关系集中判定 decision；`pending` 可保存但不登记，只有硬资格满足且核心缺口全为可迁移待确认时才可 `consider`，冲突/无证据不能被其他要求抵消。
 
 ## Choose an entry point
 

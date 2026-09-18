@@ -265,6 +265,70 @@ class MatchingValidatorTests(unittest.TestCase):
         self.assertIn("SUPPORT_CONCLUSION_CONFLICT", codes)
         self.assertFalse(report["readiness"]["can_register_selected_position"])
 
+    def test_combined_core_conflict_and_transferable_pending(self):
+        root = self.with_record()
+        position = root.record["positions"][0]
+        conflict_requirement = position["requirements"][1]
+        conflict_requirement["support"] = "conflict"
+        conflict_requirement["conclusion"] = "not_satisfied"
+        transferable_requirement = position["requirements"][2]
+        transferable_requirement["category"] = "core_capability"
+        transferable_requirement["candidate_evidence_ids"] = ["ev-2"]
+        transferable_requirement["support"] = "transferable"
+        transferable_requirement["conclusion"] = "pending"
+        position["requirement_summary"] = summary_for(position["requirements"])
+
+        position["decision"]["state"] = "pending"
+        report = run_validator(root, 0)
+        self.assertTrue(report["mechanical_passed"])
+        self.assertEqual(report["positions"][0]["status"], "verified")
+        self.assertFalse(report["readiness"]["can_register_selected_position"])
+
+        position["decision"]["state"] = "consider"
+        report = run_validator(root, 1)
+        self.assertTrue(any(issue["code"] == "DECISION_STATE_MISMATCH" for issue in report["issues"]))
+        self.assertFalse(report["readiness"]["can_register_selected_position"])
+
+    def test_core_no_evidence_conflict_and_transferable_are_not_registerable(self):
+        root = self.with_record()
+        position = root.record["positions"][0]
+        conflict_requirement = position["requirements"][1]
+        conflict_requirement["support"] = "conflict"
+        conflict_requirement["conclusion"] = "not_satisfied"
+        no_evidence_requirement = position["requirements"][2]
+        no_evidence_requirement["category"] = "core_capability"
+        no_evidence_requirement["candidate_evidence_ids"] = []
+        no_evidence_requirement["support"] = "no_evidence"
+        no_evidence_requirement["conclusion"] = "pending"
+        transferable_requirement = dict(no_evidence_requirement)
+        transferable_requirement["requirement_id"] = "role-1-req-4"
+        transferable_requirement["candidate_evidence_ids"] = ["ev-2"]
+        transferable_requirement["support"] = "transferable"
+        position["requirements"].append(transferable_requirement)
+        position["requirement_summary"] = summary_for(position["requirements"])
+        position["decision"]["state"] = "pending"
+        report = run_validator(root, 0)
+        self.assertEqual(report["positions"][0]["status"], "verified")
+        self.assertEqual(report["positions"][0]["requirement_summary"]["pending"], 2)
+        self.assertFalse(report["readiness"]["can_register_selected_position"])
+
+    def test_hard_pending_with_transferable_core_cannot_register(self):
+        root = self.with_record()
+        position = root.record["positions"][0]
+        hard_requirement = position["requirements"][0]
+        hard_requirement["candidate_evidence_ids"] = []
+        hard_requirement["support"] = "no_evidence"
+        hard_requirement["conclusion"] = "pending"
+        core_requirement = position["requirements"][1]
+        core_requirement["candidate_evidence_ids"] = ["ev-2"]
+        core_requirement["support"] = "transferable"
+        core_requirement["conclusion"] = "pending"
+        position["requirement_summary"] = summary_for(position["requirements"])
+        position["decision"]["state"] = "consider"
+        report = run_validator(root, 1)
+        self.assertTrue(any(issue["code"] == "HARD_QUALIFICATION_UNRESOLVED" for issue in report["issues"]))
+        self.assertFalse(report["readiness"]["can_register_selected_position"])
+
     def test_invalid_enum_types_return_structured_reports(self):
         invalid_values = [[], {}, 1, True, None]
         for field in ("category", "support", "conclusion", "decision.state", "coverage.capture_status", "grade"):
