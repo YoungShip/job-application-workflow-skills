@@ -18,6 +18,7 @@ metadata:
 5. 有限志愿、投后不可修改、截止日、面试形式和跨项目额度必须显著说明；规则冲突保持待核实。
 6. 主表只能通过适配器的 `snapshot → preview → apply → read-back` 流程更新，禁止直接编辑 CSV 或按行号定位。
 7. 新研究岗位须经用户选定，并且 `matching.json` 验证通过后，才登记为待投。
+8. 原始目录身份和证据引用必须使用显式、稳定的字符串 ID；校验器报告为 `invalid` 或 `unverifiable` 时，只能展示已核实岗位，不能宣称全量完成。
 
 ## Choose an entry point
 

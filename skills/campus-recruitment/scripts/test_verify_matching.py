@@ -258,6 +258,28 @@ class MatchingValidatorTests(unittest.TestCase):
         self.assertEqual(report["readiness"]["status"], "partial")
         self.assertTrue(any(issue["code"] == "RAW_CATALOG_INVALID_JSON" and issue["severity"] == "error" for issue in report["issues"]))
 
+    def test_duplicate_catalog_identity_blocks_reconciliation(self):
+        root = self.with_record()
+        root.record["catalog_index"].append(dict(root.record["catalog_index"][0]))  # type: ignore[attr-defined]
+        report = run_validator(root, 1)
+        self.assertNotEqual(report["checks"]["catalog_reconciliation"], "verified")
+        self.assertFalse(report["passed"])
+        self.assertTrue(any(issue["code"] == "CATALOG_DUPLICATE_IDS" for issue in report["issues"]))
+
+    def test_invalid_catalog_encoding_is_reported_not_crashed(self):
+        root = self.with_record()
+        (root / "catalog.csv").write_text("position_id,title\nrole-1,Fixture QA Engineer\n", encoding="utf-8")
+        root.record["raw_catalog"] = {  # type: ignore[attr-defined]
+            "file": "catalog.csv",
+            "format": "csv",
+            "id_column": "position_id",
+            "encoding": 123,
+            "total_positions": 1,
+        }
+        report = run_validator(root, 1)
+        self.assertEqual(report["checks"]["catalog_reconciliation"], "invalid")
+        self.assertTrue(any(issue["code"] == "RAW_CATALOG_INVALID_TABLE" for issue in report["issues"]))
+
     def test_explicit_csv_id_extraction_is_supported(self):
         root = self.with_record()
         (root / "catalog.csv").write_text("position_id,title\nrole-1,Fixture QA Engineer\n", encoding="utf-8")
@@ -295,6 +317,19 @@ class MatchingValidatorTests(unittest.TestCase):
         codes = {issue["code"] for issue in report["issues"]}
         self.assertIn("JD_QUOTE_REFERENCE_UNKNOWN", codes)
         self.assertIn("CANDIDATE_EVIDENCE_REFERENCE_UNKNOWN", codes)
+
+    def test_reference_ids_must_remain_strings(self):
+        root = self.with_record()
+        position = root.record["positions"][0]  # type: ignore[attr-defined]
+        position["jd_source"]["quotes"][0]["id"] = "1"
+        position["candidate_source"]["evidence"][0]["id"] = "1"
+        position["requirements"][0]["jd_quote_ids"] = [1]
+        position["requirements"][0]["category_basis_quote_ids"] = [1]
+        position["requirements"][0]["candidate_evidence_ids"] = [1]
+        report = run_validator(root, 1)
+        codes = {issue["code"] for issue in report["issues"]}
+        self.assertIn("REQUIREMENT_REFERENCE_MISSING", codes)
+        self.assertIn("REQUIREMENT_REFERENCE_TYPE_INVALID", codes)
 
     def test_quote_must_exist_in_declared_snapshot(self):
         root = self.with_record()
@@ -361,6 +396,27 @@ class MatchingValidatorTests(unittest.TestCase):
         report = run_validator(root, 1)
         self.assertTrue(any(issue["code"] == "REQUIREMENT_SUMMARY_MISMATCH" for issue in report["issues"]))
 
+    def test_required_position_fields_are_structurally_checked(self):
+        root = self.with_record()
+        root.record["positions"][0].pop("city")  # type: ignore[attr-defined]
+        report = run_validator(root, 1)
+        self.assertEqual(report["checks"]["structure"], "failed")
+        self.assertTrue(any(issue["code"] == "POSITION_FIELD_INVALID" for issue in report["issues"]))
+
+    def test_boolean_scope_fields_are_not_coerced(self):
+        root = self.with_record()
+        root.record["positions"][0]["excluded"] = "false"  # type: ignore[attr-defined]
+        report = run_validator(root, 1)
+        self.assertEqual(report["checks"]["structure"], "failed")
+        self.assertTrue(any(issue["code"] == "POSITION_FIELD_INVALID" for issue in report["issues"]))
+
+    def test_non_object_coverage_is_structural_failure(self):
+        root = self.with_record()
+        root.record["coverage"] = "complete"  # type: ignore[attr-defined]
+        report = run_validator(root, 1)
+        self.assertEqual(report["checks"]["structure"], "failed")
+        self.assertTrue(any(issue["code"] == "COVERAGE_INVALID" for issue in report["issues"]))
+
     def test_hash_and_locator_are_actually_checked(self):
         root = self.with_record()
         for name in ("role-1-jd.txt", "role-1-candidate.txt"):
@@ -399,6 +455,23 @@ class MatchingValidatorTests(unittest.TestCase):
             self.assertFalse(report["passed"])
             self.assertFalse(report["readiness"]["can_generate_full_comparison"])
             self.assertEqual(path_record.read_text(encoding="utf-8"), original)
+
+    def test_invalid_json_report_keeps_all_check_dimensions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "matching.json"
+            path.write_text("{not json", encoding="utf-8")
+            result = subprocess.run(
+                [sys.executable, "-X", "utf8", str(SCRIPT), str(path)],
+                capture_output=True,
+            )
+            self.assertEqual(result.returncode, 1)
+            report = json.loads(result.stdout.decode("utf-8"))
+            self.assertEqual(
+                set(report["checks"]),
+                {"structure", "catalog_reconciliation", "evidence_consistency", "decision_consistency", "coverage_attestation"},
+            )
+            self.assertFalse(report["mechanical_passed"])
+            self.assertEqual(report["readiness"]["status"], "blocked")
 
     def test_partial_positions_are_displayable_without_full_claim(self):
         root = self.with_record(lambda path: valid_record(path, ("role-1", "role-2")))

@@ -21,3 +21,5 @@
 - `readiness.can_register_selected_position` 判断能否进入主表登记前的人审与用户确认。
 
 非零报告仍可能包含已核实岗位，可以展示这些岗位；但不能因此宣称全量完成或直接写入主表。
+
+如果输入 JSON 本身损坏，报告会把 `structure` 标为 `failed`，其余尚未运行的维度标为 `not_run`，并将 `readiness.status` 设为 `blocked`。调用方不能把这种兼容读取或部分岗位展示当作目录、证据和推荐已经核验完成。

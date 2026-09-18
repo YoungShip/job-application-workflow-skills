@@ -137,7 +137,11 @@ def legacy_result(data: dict[str, Any]) -> dict[str, Any]:
             "id": item_id or "<missing-id>",
             "in_scope": None,
             "status": "legacy_unverified",
-            "checks": {"structure": "legacy_unverified", "evidence_consistency": "unverified"},
+            "checks": {
+                "structure": "legacy_unverified",
+                "evidence_consistency": "unverified",
+                "decision_consistency": "unverified",
+            },
             "issues": ["LEGACY_SCHEMA"],
             "next_step": "migrate_to_schema_2",
         })
@@ -153,8 +157,19 @@ def legacy_result(data: dict[str, Any]) -> dict[str, Any]:
         passed=False,
         overall_status="legacy_unverified",
         compatibility={"mode": "legacy/unverified", "readable": True, "migration_required": True},
-        checks={"structure": "legacy_unverified", "catalog_reconciliation": "unverified", "evidence_consistency": "unverified"},
-        coverage={"snapshot_consistency": "unverified", "official_completeness": "unproven", "message": "旧记录可展示但不能宣称已验证"},
+        checks={
+            "structure": "legacy_unverified",
+            "catalog_reconciliation": "unverified",
+            "evidence_consistency": "unverified",
+            "decision_consistency": "unverified",
+            "coverage_attestation": "unverified",
+        },
+        coverage={
+            "snapshot_consistency": "unverified",
+            "official_completeness": "unproven",
+            "attestation_check": "unresolved",
+            "message": "旧记录可展示但不能宣称已验证",
+        },
         counts={
             "catalog_total": len(catalog),
             "in_scope_catalog": sum(1 for item in catalog if isinstance(item, dict) and item.get("in_scope") is True),
@@ -180,6 +195,7 @@ def legacy_result(data: dict[str, Any]) -> dict[str, Any]:
         warnings=[],
         company=data.get("company"),
         date=data.get("date"),
+        mechanical_passed=False,
     )
 
 
@@ -298,7 +314,7 @@ def parse_catalog(raw: dict[str, Any], matching_path: Path, issues: Issues) -> d
                 path="raw_catalog.id_column", outcome="unverified",
             )
             return result
-        except (OSError, UnicodeDecodeError, csv.Error) as error:
+        except (OSError, UnicodeDecodeError, LookupError, TypeError, ValueError, csv.Error) as error:
             issues.add(
                 "RAW_CATALOG_INVALID_TABLE", "catalog_reconciliation",
                 f"原始表格无法解析：{error}",
@@ -544,6 +560,11 @@ def validate_position(position: Any, catalog_entry: dict[str, Any] | None, base:
             path="positions[].decision", position_id=position_id,
         )
 
+    if "excluded" in position and type(position.get("excluded")) is not bool:
+        issues.add(
+            "POSITION_FIELD_INVALID", "structure", "positions[].excluded 必须是布尔值",
+            "使用 true/false，不要用字符串或数字替代布尔值", path="positions[].excluded", position_id=position_id,
+        )
     excluded = position.get("excluded") is True
     if not in_scope:
         if not excluded or state != "not_applicable":
@@ -554,6 +575,12 @@ def validate_position(position: Any, catalog_entry: dict[str, Any] | None, base:
                 path="positions[].excluded", position_id=position_id,
             )
         return finalize_position(position_id, False, "verified", issues, start, "not_counted_as_match")
+    for field in ("title", "city"):
+        if not nonempty(position.get(field)):
+            issues.add(
+                "POSITION_FIELD_INVALID", "structure", f"范围内岗位缺少非空 {field}",
+                "补齐与目录身份对应的岗位标题和地点", path=f"positions[].{field}", position_id=position_id,
+            )
     if excluded and state != "excluded":
         issues.add(
             "EXCLUSION_DECISION_CONFLICT", "decision_consistency", "范围内被排除岗位必须 decision.state=excluded",
@@ -590,7 +617,8 @@ def validate_position(position: Any, catalog_entry: dict[str, Any] | None, base:
                 "补齐逐项要求记录", path=path, position_id=position_id,
             )
             continue
-        requirement_id = str(item.get("requirement_id", "")).strip()
+        raw_requirement_id = item.get("requirement_id")
+        requirement_id = raw_requirement_id.strip() if isinstance(raw_requirement_id, str) else ""
         if not requirement_id or requirement_id in requirement_ids:
             issues.add(
                 "REQUIREMENT_ID_INVALID", "evidence_consistency", "requirement_id 必须非空且岗位内唯一",
@@ -620,13 +648,24 @@ def validate_position(position: Any, catalog_entry: dict[str, Any] | None, base:
             ("category_basis_quote_ids", category_refs, jd_ids, "CATEGORY_BASIS_UNKNOWN", "要求类别必须引用该岗位的 JD 引文 ID"),
             ("candidate_evidence_ids", candidate_refs, candidate_ids, "CANDIDATE_EVIDENCE_REFERENCE_UNKNOWN", "候选人证据引用必须属于当前档案版本"),
         ):
-            if not isinstance(refs, list) or (field != "candidate_evidence_ids" and not refs):
+            references_valid = (
+                isinstance(refs, list)
+                and (field == "candidate_evidence_ids" or bool(refs))
+                and all(isinstance(ref, str) and bool(ref.strip()) for ref in refs)
+            )
+            if not references_valid:
                 issues.add(
                     "REQUIREMENT_REFERENCE_MISSING", "evidence_consistency", message,
                     "补齐共享来源中的 ID；无候选证据使用空数组+pending",
                     path=f"{path}.{field}", position_id=position_id, outcome="unverified",
                 )
-            elif any(str(ref) not in known for ref in refs):
+                if isinstance(refs, list) and any(not isinstance(ref, str) or not ref.strip() for ref in refs):
+                    issues.add(
+                        "REQUIREMENT_REFERENCE_TYPE_INVALID", "evidence_consistency", "引用 ID 必须是非空字符串",
+                        "不要把数字或空值强制转换成来源 ID；引用同一岗位/版本中保存的字符串 ID",
+                        path=f"{path}.{field}", position_id=position_id,
+                    )
+            elif any(ref not in known for ref in refs):
                 issues.add(
                     missing_code, "evidence_consistency", message,
                     "只引用同一岗位/版本来源中已核验的 ID",
@@ -791,6 +830,9 @@ def validate_v2(data: dict[str, Any], matching_path: Path) -> tuple[dict[str, An
     if not isinstance(data.get("raw_catalog"), dict):
         issues.add("RAW_CATALOG_INVALID", "structure", "raw_catalog 必须是对象", "提供原始目录和显式身份规则", path="raw_catalog")
         structure_ok = False
+    if "coverage" in data and not isinstance(data.get("coverage"), dict):
+        issues.add("COVERAGE_INVALID", "structure", "coverage 必须是对象", "提供 capture_status 及其覆盖声明字段", path="coverage")
+        structure_ok = False
 
     catalog_map: dict[str, dict[str, Any]] = {}
     for index, item in enumerate(catalog):
@@ -807,6 +849,15 @@ def validate_v2(data: dict[str, Any], matching_path: Path) -> tuple[dict[str, An
         if item_id in catalog_map:
             issues.add("CATALOG_DUPLICATE_IDS", "catalog_reconciliation", f"catalog_index 存在重复岗位 ID：{item_id}", "每个岗位在 catalog_index 中只保留一条", path=path)
         catalog_map[item_id] = item
+        if "city" in item and not isinstance(item.get("city"), str):
+            issues.add("CATALOG_ENTRY_FIELDS_INVALID", "structure", "目录条目的 city 必须是字符串", "修正目录条目地点字段", path=f"{path}.city")
+            structure_ok = False
+        if "url" in item and not isinstance(item.get("url"), str):
+            issues.add("CATALOG_ENTRY_FIELDS_INVALID", "structure", "目录条目的 url 必须是字符串", "修正目录条目来源链接字段", path=f"{path}.url")
+            structure_ok = False
+        if "exclusion" in item and not isinstance(item.get("exclusion"), str):
+            issues.add("CATALOG_ENTRY_FIELDS_INVALID", "structure", "目录条目的 exclusion 必须是字符串", "修正范围外岗位的排除说明", path=f"{path}.exclusion")
+            structure_ok = False
         if item.get("in_scope") is False and not nonempty(item.get("exclusion")):
             issues.add("CATALOG_SCOPE_REASON_MISSING", "structure", "范围外目录条目必须有 exclusion 解释", "说明不在本次研究范围的原因", path=f"{path}.exclusion")
             structure_ok = False
@@ -816,14 +867,21 @@ def validate_v2(data: dict[str, Any], matching_path: Path) -> tuple[dict[str, An
     raw_ids = set(raw_result["ids"])
     missing = sorted(raw_ids - catalog_ids)
     extra = sorted(catalog_ids - raw_ids)
+    catalog_index_reconciliation_failed = any(
+        item.get("check") == "catalog_reconciliation" and item.get("outcome") == "failed"
+        for item in issues.items
+    )
     if raw_result["status"] == "parsed":
         if missing or extra:
-            catalog_status = "mismatch"
             issues.add(
                 "CATALOG_ID_SET_MISMATCH", "catalog_reconciliation",
                 f"原始目录与 catalog_index ID 集合不一致；原始有而索引缺失={missing or []}，索引有而原始缺失={extra or []}",
                 "按岗位 ID 对齐目录；不能只看数量或按标题匹配", path="catalog_index",
             )
+        if catalog_index_reconciliation_failed:
+            catalog_status = "invalid"
+        elif missing or extra:
+            catalog_status = "mismatch"
         else:
             catalog_status = "verified"
     else:
@@ -970,11 +1028,23 @@ def invalid_input_report(message: str) -> dict[str, Any]:
         passed=False,
         overall_status="failed",
         compatibility={"mode": "unreadable", "readable": False, "migration_required": False},
-        checks={"structure": "failed", "catalog_reconciliation": "not_run", "evidence_consistency": "not_run"},
-        coverage={"snapshot_consistency": "not_run", "official_completeness": "unproven"},
+        checks={
+            "structure": "failed",
+            "catalog_reconciliation": "not_run",
+            "evidence_consistency": "not_run",
+            "decision_consistency": "not_run",
+            "coverage_attestation": "not_run",
+        },
+        coverage={
+            "snapshot_consistency": "not_run",
+            "official_completeness": "unproven",
+            "attestation_check": "not_run",
+            "message": "输入 JSON 无法读取，其他检查尚未运行",
+        },
         counts={}, positions=[], readiness={"status": "blocked", "can_show_verified_positions": False, "verified_position_ids": [], "can_generate_full_comparison": False, "can_register_selected_position": False, "next_step": "repair_input_json", "unresolved": ["INPUT_JSON_INVALID"]},
         issues=[{"code": "INPUT_JSON_INVALID", "severity": "error", "check": "structure", "outcome": "failed", "message": f"matching.json 无法解析：{message}", "next_step": "修复 JSON 后重新运行校验"}],
         errors=[f"matching.json 无法解析：{message}"], warnings=[],
+        mechanical_passed=False,
     )
 
 

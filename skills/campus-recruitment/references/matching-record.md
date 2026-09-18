@@ -59,7 +59,7 @@ positions[]
 }
 ```
 
-如果身份无法可靠提取，报告必须是 `unverifiable`，退出码非零，不得仅给 warning 后宣称通过。原始快照和 `catalog_index` 的 ID 集合必须分别核对缺失、多余和重复项；数量相同不能替代身份对账。
+如果身份无法可靠提取，报告必须是 `unverifiable`，退出码非零，不得仅给 warning 后宣称通过。原始快照和 `catalog_index` 的 ID 集合必须分别核对缺失、多余和重复项；数量相同不能替代身份对账。任一侧出现重复 ID 都会阻断目录对账，即使去重后的集合和数量看起来相同；损坏/不支持的输入标记为 `invalid`，缺少可靠提取规则或 ID 缺失标记为 `unverifiable`。
 
 ## 3. Scope semantics
 
@@ -67,6 +67,7 @@ positions[]
 - 范围内岗位可以在完整要求核对后 `excluded=true`，但必须写 `exclusion_reason`；例如明确硬条件不满足或用户偏好排除。
 - 范围外岗位若保留解释记录，必须 `excluded=true` 且 `decision.state=not_applicable`，不得计入有效匹配或推荐。
 - 范围内未排除岗位的 `decision.state` 为 `recommended`、`consider` 或 `pending`；决策必须由逐项 `requirements` 汇总产生。
+- 汇总中的 `recommended`、`pending`、`excluded` 计数只统计范围内岗位；范围外解释记录只能单独展示，不能进入有效匹配、推荐或主表登记条件。
 
 ## 4. Shared source records
 
@@ -143,7 +144,7 @@ positions[]
 - 候选人来源的 `evidence` 数组可以为空，以表达当前档案没有相关证据；此时对应要求必须使用 `no_evidence + pending`；
 - `hard_qualification` 为 `pending` 时不能声称满足资格，也不能直接推荐；
 - `ambiguous` 必须 `pending`；
-- 引用 ID 必须存在于同一岗位/版本的共享来源记录。
+- 引用 ID 必须是非空字符串，并存在于同一岗位/版本的共享来源记录；不能把数字或空值强制转换成 ID。
 
 ## 6. Requirement summary and decision
 
@@ -201,6 +202,8 @@ S/A/B/C 不是新格式的必填字段。若保留：S 要求硬/核心全部 sa
 - `issues[]`：带 code、severity、path、position_id、message 和 next_step。
 
 向后兼容保留 `passed/errors/warnings`，但新格式的 `passed=true` 只表示：结构、目录身份、证据引用、决策一致性和完整覆盖声明均达到进入人工复核/登记前的机械条件；它不表示官方来源真实性或语义推荐正确。`mechanical_passed` 单独表示结构/对账/证据/决策四项机械检查是否通过。新调用点应优先读取 `checks`、`coverage` 和 `readiness`；即使旧调用只看退出码，也不能把非零时已列出的单岗结果丢弃。
+
+输入 JSON 损坏时也必须返回完整检查维度：`structure=failed`，目录、证据、决策和覆盖检查为 `not_run`，`readiness.status=blocked`。旧记录则返回所有维度的 `legacy_unverified/unverified`；可读取或可展示不等于满足新标准。
 
 ## 8. Example: VLA inference is not VLA training
 
