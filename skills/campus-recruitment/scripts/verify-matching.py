@@ -185,6 +185,9 @@ def legacy_result(data: dict[str, Any]) -> dict[str, Any]:
             "status": "blocked",
             "can_show_verified_positions": False,
             "verified_position_ids": [],
+            "registerable_position_ids": [],
+            "selected_position_id": None,
+            "selected_position_status": "invalid",
             "can_generate_full_comparison": False,
             "can_register_selected_position": False,
             "next_step": "migrate_to_schema_2",
@@ -510,15 +513,15 @@ def source_entries(source: Any, kind: str, position_id: str, base: Path, issues:
 
 
 def summary(requirements: list[dict[str, Any]]) -> dict[str, int]:
-    categories = Counter(item.get("category") for item in requirements)
-    supports = Counter(item.get("support") for item in requirements)
-    conclusions = Counter(item.get("conclusion") for item in requirements)
+    def count(field: str, value: str) -> int:
+        return sum(1 for item in requirements if isinstance(item, dict) and type(item.get(field)) is str and item.get(field) == value)
+
     return {
         "requirements_total": len(requirements),
-        **{key: categories[key] for key in ("hard_qualification", "core_capability", "plus", "ambiguous")},
-        "core_total": categories["hard_qualification"] + categories["core_capability"],
-        **{key: supports[key] for key in ("direct_support", "transferable", "no_evidence", "conflict")},
-        **{key: conclusions[key] for key in ("satisfied", "not_satisfied", "pending")},
+        **{key: count("category", key) for key in ("hard_qualification", "core_capability", "plus", "ambiguous")},
+        "core_total": count("category", "hard_qualification") + count("category", "core_capability"),
+        **{key: count("support", key) for key in ("direct_support", "transferable", "no_evidence", "conflict")},
+        **{key: count("conclusion", key) for key in ("satisfied", "not_satisfied", "pending")},
     }
 
 
@@ -547,7 +550,8 @@ def validate_position(position: Any, catalog_entry: dict[str, Any] | None, base:
     in_scope = catalog_entry.get("in_scope") is True
     decision = position.get("decision")
     state = decision.get("state") if isinstance(decision, dict) else None
-    if state not in DECISIONS:
+    state_valid = type(state) is str and state in DECISIONS
+    if not state_valid:
         issues.add(
             "DECISION_INVALID", "decision_consistency", "decision.state 枚举值无效",
             "使用 recommended/consider/pending/excluded/not_applicable，并由 summary 汇总产生",
@@ -586,7 +590,7 @@ def validate_position(position: Any, catalog_entry: dict[str, Any] | None, base:
             "EXCLUSION_DECISION_CONFLICT", "decision_consistency", "范围内被排除岗位必须 decision.state=excluded",
             "补充排除理由或取消 excluded 并完成匹配", path="positions[].decision.state", position_id=position_id,
         )
-    if not excluded and state in {"excluded", "not_applicable"}:
+    if state_valid and not excluded and state in {"excluded", "not_applicable"}:
         issues.add(
             "MATCH_DECISION_CONFLICT", "decision_consistency", "范围内未排除岗位不能使用 excluded/not_applicable",
             "根据 requirements 选择 recommended/consider/pending", path="positions[].decision.state", position_id=position_id,
@@ -632,12 +636,25 @@ def validate_position(position: Any, catalog_entry: dict[str, Any] | None, base:
                     "保留要求原文语义和该项判断", path=f"{path}.{field}", position_id=position_id, outcome="unverified",
                 )
         category, conclusion, support = item.get("category"), item.get("conclusion"), item.get("support")
-        if category not in CATEGORIES:
+        category_valid = type(category) is str and category in CATEGORIES
+        conclusion_valid = type(conclusion) is str and conclusion in CONCLUSIONS
+        support_valid = type(support) is str and support in SUPPORTS
+        if not category_valid:
             issues.add(
                 "REQUIREMENT_CATEGORY_INVALID", "evidence_consistency", "requirement.category 枚举值无效",
                 "按 JD 原文分类；语义不明确使用 ambiguous", path=f"{path}.category", position_id=position_id,
             )
-        if conclusion not in CONCLUSIONS or support not in SUPPORTS:
+        if not conclusion_valid:
+            issues.add(
+                "REQUIREMENT_CONCLUSION_INVALID", "evidence_consistency", "requirement.conclusion 枚举值无效",
+                "使用 satisfied/not_satisfied/pending", path=f"{path}.conclusion", position_id=position_id,
+            )
+        if not support_valid:
+            issues.add(
+                "REQUIREMENT_SUPPORT_INVALID", "evidence_consistency", "requirement.support 枚举值无效",
+                "使用 direct_support/transferable/no_evidence/conflict", path=f"{path}.support", position_id=position_id,
+            )
+        if not conclusion_valid or not support_valid:
             issues.add(
                 "REQUIREMENT_JUDGMENT_INVALID", "evidence_consistency", "requirement conclusion/support 枚举值无效",
                 "分别填写 satisfied/not_satisfied/pending 与支持关系", path=path, position_id=position_id,
@@ -677,7 +694,7 @@ def validate_position(position: Any, catalog_entry: dict[str, Any] | None, base:
                 "NO_EVIDENCE_HAS_REFERENCES", "evidence_consistency", "support=no_evidence 时候选证据数组必须为空",
                 "无证据保持空引用和 pending", path=f"{path}.candidate_evidence_ids", position_id=position_id,
             )
-        if support in {"direct_support", "transferable", "conflict"} and not candidate_refs:
+        if support_valid and support in {"direct_support", "transferable", "conflict"} and not candidate_refs:
             issues.add(
                 "SUPPORT_WITHOUT_EVIDENCE", "evidence_consistency", f"support={support} 必须有候选证据引用",
                 "补充证据 ID，或改为 no_evidence+pending", path=f"{path}.candidate_evidence_ids", position_id=position_id,
@@ -692,7 +709,20 @@ def validate_position(position: Any, catalog_entry: dict[str, Any] | None, base:
                 "NO_EVIDENCE_NOT_FAILURE", "evidence_consistency", "无证据不能直接推出 not_satisfied",
                 "改为 pending，或提供明确不满足/冲突证据", path=f"{path}.conclusion", position_id=position_id,
             )
-        if category == "ambiguous" and conclusion != "pending":
+        allowed_conclusions = {
+            "direct_support": {"satisfied", "pending"},
+            "transferable": {"pending"},
+            "no_evidence": {"pending"},
+            "conflict": {"pending", "not_satisfied"},
+        }
+        if support_valid and conclusion_valid and conclusion not in allowed_conclusions[support]:
+            issues.add(
+                "SUPPORT_CONCLUSION_CONFLICT", "evidence_consistency",
+                f"support={support} 不允许与 conclusion={conclusion} 组合",
+                "冲突不得 satisfied；可迁移/无证据必须 pending；不满足需有冲突或明确失败依据",
+                path=path, position_id=position_id,
+            )
+        if category_valid and category == "ambiguous" and conclusion != "pending":
             issues.add(
                 "AMBIGUOUS_NOT_PENDING", "evidence_consistency", "语义不明确的要求必须保持 conclusion=pending",
                 "先核实 JD 语义，不要升级为满足或不满足", path=f"{path}.conclusion", position_id=position_id,
@@ -708,7 +738,15 @@ def validate_position(position: Any, catalog_entry: dict[str, Any] | None, base:
         )
     else:
         for field, value in expected.items():
-            if supplied.get(field) != value:
+            actual = supplied.get(field)
+            if type(actual) is not int:
+                issues.add(
+                    "SUMMARY_FIELD_TYPE_INVALID", "decision_consistency",
+                    f"requirement_summary.{field} 必须是整数，不能使用布尔值、数字字符串或空值",
+                    "使用由 requirements 统计得到的整数计数",
+                    path=f"positions[].requirement_summary.{field}", position_id=position_id,
+                )
+            elif actual != value:
                 issues.add(
                     "REQUIREMENT_SUMMARY_MISMATCH", "decision_consistency", f"requirement_summary.{field} 应为 {value}",
                     "从逐项 requirements 重新计算汇总，不手工填匹配度",
@@ -717,23 +755,46 @@ def validate_position(position: Any, catalog_entry: dict[str, Any] | None, base:
 
     hard_pending = any(item.get("category") == "hard_qualification" and item.get("conclusion") == "pending" for item in requirements if isinstance(item, dict))
     hard_failed = any(item.get("category") == "hard_qualification" and item.get("conclusion") == "not_satisfied" for item in requirements if isinstance(item, dict))
-    core_failed = any(item.get("category") in {"hard_qualification", "core_capability"} and item.get("conclusion") == "not_satisfied" for item in requirements if isinstance(item, dict))
-    core_pending = any(item.get("category") in {"hard_qualification", "core_capability"} and item.get("conclusion") == "pending" for item in requirements if isinstance(item, dict))
-    direct_core = any(item.get("category") in {"hard_qualification", "core_capability"} and item.get("support") == "direct_support" for item in requirements if isinstance(item, dict))
+    core_failed = any(type(item.get("category")) is str and item.get("category") in {"hard_qualification", "core_capability"} and item.get("conclusion") == "not_satisfied" for item in requirements if isinstance(item, dict))
+    core_pending = any(type(item.get("category")) is str and item.get("category") in {"hard_qualification", "core_capability"} and item.get("conclusion") == "pending" for item in requirements if isinstance(item, dict))
+    direct_core = any(type(item.get("category")) is str and item.get("category") in {"hard_qualification", "core_capability"} and item.get("support") == "direct_support" for item in requirements if isinstance(item, dict))
+    core_pending_items = [
+        item for item in requirements
+        if isinstance(item, dict)
+        and type(item.get("category")) is str
+        and item.get("category") in {"hard_qualification", "core_capability"}
+        and item.get("conclusion") == "pending"
+    ]
+    core_pending_supports = [item.get("support") for item in core_pending_items]
     if state == "recommended" and (hard_pending or hard_failed or core_failed or core_pending or not direct_core):
         issues.add(
             "RECOMMENDATION_NOT_SUPPORTED", "decision_consistency", "recommended 不能含待确认/失败的硬/核心要求，且需直接支持证据",
             "改为 consider/pending/excluded，或补齐并核实逐项证据",
             path="positions[].decision.state", position_id=position_id,
         )
-    if state in {"recommended", "consider"} and (hard_pending or hard_failed):
+    if state_valid and state in {"recommended", "consider"} and (hard_pending or hard_failed):
         issues.add(
             "HARD_QUALIFICATION_UNRESOLVED", "decision_consistency", "硬资格待确认/不满足时不能进入推荐或考虑",
             "保持 pending 或 excluded，先核实硬资格",
             path="positions[].decision.state", position_id=position_id,
         )
+    if state == "consider":
+        if not core_pending_items or any(support != "transferable" for support in core_pending_supports):
+            issues.add(
+                "DECISION_STATE_MISMATCH", "decision_consistency",
+                "consider 只适用于硬资格已满足且核心能力存在可迁移但未定论的证据",
+                "核心无证据/冲突保持 pending；没有核心待确认项不能标 consider",
+                path="positions[].decision.state", position_id=position_id,
+            )
+    elif state == "pending" and core_pending_items and all(support == "transferable" for support in core_pending_supports):
+        issues.add(
+            "DECISION_STATE_MISMATCH", "decision_consistency",
+            "核心能力只有可迁移证据时应使用 consider，不能用 pending 获得不同登记权限",
+            "若允许用户尝试性申请，改为 consider；若无可迁移证据则保持 pending",
+            path="positions[].decision.state", position_id=position_id,
+        )
     grade = position.get("grade")
-    if grade is not None and grade not in GRADES:
+    if "grade" in position and (type(grade) is not str or grade not in GRADES):
         issues.add(
             "GRADE_INVALID", "decision_consistency", "grade 只能是 S/A/B/C",
             "优先使用 requirement_summary；如保留等级请修正枚举值",
@@ -810,6 +871,15 @@ def finalize_position(position_id: str, in_scope: bool, forced_status: str | Non
 def validate_v2(data: dict[str, Any], matching_path: Path) -> tuple[dict[str, Any], int]:
     issues = Issues()
     structure_ok = True
+    selected_position_id = data.get("selected_position_id") if "selected_position_id" in data else None
+    if "selected_position_id" in data and (type(selected_position_id) is not str or not selected_position_id.strip()):
+        issues.add(
+            "SELECTED_POSITION_ID_INVALID", "structure",
+            "selected_position_id 必须是非空字符串",
+            "将用户选中的稳定岗位 ID 作为字符串传入；未选择时省略该字段",
+            path="selected_position_id",
+        )
+        structure_ok = False
     for field in ("company", "date", "scope", "coverage", "raw_catalog", "catalog_index", "positions"):
         if field not in data:
             issues.add("ROOT_FIELD_MISSING", "structure", f"缺少根字段：{field}", "按 schema v2 补齐记录结构", path=field)
@@ -895,7 +965,7 @@ def validate_v2(data: dict[str, Any], matching_path: Path) -> tuple[dict[str, An
     coverage = data.get("coverage") if isinstance(data.get("coverage"), dict) else {}
     capture = coverage.get("capture_status")
     coverage_start = len(issues.items)
-    if capture not in CAPTURE_STATES:
+    if type(capture) is not str or capture not in CAPTURE_STATES:
         issues.add("COVERAGE_STATUS_INVALID", "coverage", "coverage.capture_status 必须是 complete/partial/unknown", "明确目录覆盖状态", path="coverage.capture_status", outcome="unverified")
         capture = "unknown"
     official_total = coverage.get("official_total")
@@ -956,6 +1026,15 @@ def validate_v2(data: dict[str, Any], matching_path: Path) -> tuple[dict[str, An
         elif result["status"] == "verified" and any(item.get("outcome") == "unverified" for item in own):
             result["status"] = "unverified"
 
+    position_by_id = {result["id"]: result for result in position_results}
+    if isinstance(selected_position_id, str) and selected_position_id not in position_by_id:
+        issues.add(
+            "SELECTED_POSITION_NOT_FOUND", "decision_consistency",
+            f"selected_position_id 不在 positions 中：{selected_position_id}",
+            "核对用户选择的岗位 ID，并只允许从本次报告中的岗位中选择",
+            path="selected_position_id",
+        )
+
     verified_ids = [result["id"] for result in position_results if result["in_scope"] is True and result["status"] == "verified"]
     all_positions_valid = not missing_positions and all(result["status"] == "verified" for result in position_results if result["in_scope"] is True)
     structure_status = "failed" if structure_ok is False or any(item["check"] == "structure" and item["outcome"] == "failed" for item in issues.items) else "passed"
@@ -963,7 +1042,6 @@ def validate_v2(data: dict[str, Any], matching_path: Path) -> tuple[dict[str, An
     decision_status = "failed" if any(item["check"] == "decision_consistency" and item["outcome"] == "failed" for item in issues.items) else "passed"
     mechanical_passed = structure_status == "passed" and catalog_status == "verified" and evidence_status == "passed" and decision_status == "passed"
     full_ready = mechanical_passed and all_positions_valid and coverage_valid
-    position_by_id = {result["id"]: result for result in position_results}
     recommended = sum(1 for item_id, item in position_map.items() if item_id in position_by_id and position_by_id[item_id]["status"] == "verified" and isinstance(item.get("decision"), dict) and item["decision"].get("state") == "recommended" and item.get("excluded") is not True and item_id in in_scope_ids)
     pending = sum(1 for item_id, item in position_map.items() if item_id in in_scope_ids and isinstance(item.get("decision"), dict) and item["decision"].get("state") == "pending")
     excluded = sum(1 for item_id, item in position_map.items() if item_id in in_scope_ids and item.get("excluded") is True)
@@ -979,21 +1057,44 @@ def validate_v2(data: dict[str, Any], matching_path: Path) -> tuple[dict[str, An
         "missing_in_scope_positions": len(missing_positions),
         "raw_catalog_total": raw_result.get("count"),
     }
-    can_register = full_ready and any(
-        result["id"] in position_map
+    registerable_position_ids = [] if not full_ready else [
+        result["id"] for result in position_results
+        if result["id"] in position_map
         and result["status"] == "verified"
+        and result["in_scope"] is True
         and isinstance(position_map[result["id"]].get("decision"), dict)
         and position_map[result["id"]]["decision"].get("state") in {"recommended", "consider"}
         and position_map[result["id"]].get("excluded") is not True
-        for result in position_results
-    )
+    ]
+    if selected_position_id is None:
+        selected_position_status = "selection_required"
+    elif not isinstance(selected_position_id, str) or not selected_position_id.strip():
+        selected_position_status = "invalid"
+    elif selected_position_id not in position_by_id:
+        selected_position_status = "unknown"
+    elif selected_position_id in registerable_position_ids:
+        selected_position_status = "registerable"
+    else:
+        selected_position_status = "not_registerable"
+    can_register = selected_position_status == "registerable" and selected_position_id in registerable_position_ids
+    if not full_ready:
+        next_step = "review_verified_positions_only" if verified_ids else "resolve_unresolved_checks"
+    elif selected_position_status == "selection_required":
+        next_step = "select_position_from_registerable_ids"
+    elif selected_position_status == "registerable":
+        next_step = "user_review_and_register_selected_position"
+    else:
+        next_step = "selected_position_not_registerable"
     readiness = {
         "status": "ready_for_human_review" if full_ready else "partial" if verified_ids else "blocked",
         "can_show_verified_positions": bool(verified_ids),
         "verified_position_ids": verified_ids,
+        "registerable_position_ids": registerable_position_ids,
+        "selected_position_id": selected_position_id,
+        "selected_position_status": selected_position_status,
         "can_generate_full_comparison": full_ready,
         "can_register_selected_position": can_register,
-        "next_step": "generate_comparison_and_review_recommendations" if full_ready else "review_verified_positions_only" if verified_ids else "resolve_unresolved_checks",
+        "next_step": next_step,
         "unresolved": sorted({item["code"] for item in issues.items if item["severity"] in {"error", "warning"}}),
         "message": "可展示单岗核验结果不等于全量比较完成；可进入下一步也不等于语义推荐一定正确",
     }
@@ -1041,7 +1142,7 @@ def invalid_input_report(message: str) -> dict[str, Any]:
             "attestation_check": "not_run",
             "message": "输入 JSON 无法读取，其他检查尚未运行",
         },
-        counts={}, positions=[], readiness={"status": "blocked", "can_show_verified_positions": False, "verified_position_ids": [], "can_generate_full_comparison": False, "can_register_selected_position": False, "next_step": "repair_input_json", "unresolved": ["INPUT_JSON_INVALID"]},
+        counts={}, positions=[], readiness={"status": "blocked", "can_show_verified_positions": False, "verified_position_ids": [], "registerable_position_ids": [], "selected_position_id": None, "selected_position_status": "invalid", "can_generate_full_comparison": False, "can_register_selected_position": False, "next_step": "repair_input_json", "unresolved": ["INPUT_JSON_INVALID"]},
         issues=[{"code": "INPUT_JSON_INVALID", "severity": "error", "check": "structure", "outcome": "failed", "message": f"matching.json 无法解析：{message}", "next_step": "修复 JSON 后重新运行校验"}],
         errors=[f"matching.json 无法解析：{message}"], warnings=[],
         mechanical_passed=False,

@@ -130,6 +130,7 @@ def valid_record(root: Path, role_ids: tuple[str, ...] = ("role-1",)) -> dict[st
         "company": "Fixture Company",
         "date": "2026-01-01",
         "scope": "Fictional fixture only",
+        "selected_position_id": "role-1",
         "coverage": {
             "capture_status": "complete",
             "official_total": len(role_ids),
@@ -171,6 +172,7 @@ def vla_record(root: Path) -> dict[str, Any]:
         "company": "Fixture Robotics",
         "date": "2026-01-01",
         "scope": "Fictional semantic fixture",
+        "selected_position_id": "vla-role",
         "coverage": {"capture_status": "complete", "official_total": 1, "last_page_reached": True, "human_attested": True},
         "raw_catalog": {"file": "catalog.json", "format": "json", "records_path": "", "id_path": "/id", "total_positions": 1},
         "catalog_index": [{"id": "vla-role", "title": "VLA Engineer", "city": "Fixture City", "in_scope": True}],
@@ -192,7 +194,7 @@ def vla_record(root: Path) -> dict[str, Any]:
             },
             "requirements": requirements,
             "requirement_summary": summary_for(requirements),
-            "decision": {"state": "pending", "basis": "requirement_summary", "reason": "核心训练能力仍需核实。"},
+            "decision": {"state": "consider", "basis": "requirement_summary", "reason": "核心训练能力有可迁移证据，允许用户考虑尝试性申请。"},
         }],
     }
 
@@ -206,6 +208,8 @@ def run_validator(root: Fixture, expected_exit: int | None = None) -> dict[str, 
     )
     if expected_exit is not None and result.returncode != expected_exit:
         raise AssertionError(result.stdout.decode("utf-8", errors="replace") + result.stderr.decode("utf-8", errors="replace"))
+    if not result.stdout.strip():
+        raise AssertionError(result.stderr.decode("utf-8", errors="replace"))
     return json.loads(result.stdout.decode("utf-8"))
 
 
@@ -223,6 +227,105 @@ class MatchingValidatorTests(unittest.TestCase):
         self.assertEqual(report["checks"]["evidence_consistency"], "passed")
         self.assertTrue(report["readiness"]["can_generate_full_comparison"])
         self.assertTrue(report["readiness"]["can_register_selected_position"])
+
+    def test_register_permission_is_bound_to_selected_position(self):
+        root = self.with_record(lambda path: valid_record(path, ("role-a", "role-b")))
+        root.record["selected_position_id"] = "role-b"
+        b_position = root.record["positions"][1]
+        hard_requirement = b_position["requirements"][0]
+        hard_requirement["candidate_evidence_ids"] = []
+        hard_requirement["support"] = "no_evidence"
+        hard_requirement["conclusion"] = "pending"
+        b_position["requirement_summary"] = summary_for(b_position["requirements"])
+        b_position["decision"] = {
+            "state": "pending",
+            "basis": "requirement_summary",
+            "reason": "B 岗位硬资格仍待确认。",
+        }
+        report = run_validator(root, 0)
+        self.assertEqual(report["readiness"]["registerable_position_ids"], ["role-a"])
+        self.assertEqual(report["readiness"]["selected_position_id"], "role-b")
+        self.assertEqual(report["readiness"]["selected_position_status"], "not_registerable")
+        self.assertFalse(report["readiness"]["can_register_selected_position"])
+
+        root.record["selected_position_id"] = "role-a"
+        report = run_validator(root, 0)
+        self.assertEqual(report["readiness"]["selected_position_status"], "registerable")
+        self.assertTrue(report["readiness"]["can_register_selected_position"])
+
+    def test_conflict_cannot_be_satisfied_or_recommended(self):
+        root = self.with_record()
+        position = root.record["positions"][0]
+        requirement = position["requirements"][1]
+        requirement["support"] = "conflict"
+        requirement["conclusion"] = "satisfied"
+        position["requirement_summary"] = summary_for(position["requirements"])
+        report = run_validator(root, 1)
+        codes = {issue["code"] for issue in report["issues"]}
+        self.assertIn("SUPPORT_CONCLUSION_CONFLICT", codes)
+        self.assertFalse(report["readiness"]["can_register_selected_position"])
+
+    def test_invalid_enum_types_return_structured_reports(self):
+        invalid_values = [[], {}, 1, True, None]
+        for field in ("category", "support", "conclusion", "decision.state", "coverage.capture_status", "grade"):
+            for invalid in invalid_values:
+                with self.subTest(field=field, invalid=repr(invalid)):
+                    root = self.with_record()
+                    position = root.record["positions"][0]
+                    if field == "category":
+                        position["requirements"][0]["category"] = invalid
+                    elif field == "support":
+                        position["requirements"][0]["support"] = invalid
+                    elif field == "conclusion":
+                        position["requirements"][0]["conclusion"] = invalid
+                    elif field == "decision.state":
+                        position["decision"]["state"] = invalid
+                    elif field == "coverage.capture_status":
+                        root.record["coverage"]["capture_status"] = invalid
+                    else:
+                        position["grade"] = invalid
+                    report = run_validator(root, 1)
+                    self.assertEqual(set(report["checks"]), {
+                        "structure", "catalog_reconciliation", "evidence_consistency", "decision_consistency", "coverage_attestation"
+                    })
+                    self.assertIn("issues", report)
+                    self.assertIn("readiness", report)
+
+    def test_summary_boolean_counts_are_invalid(self):
+        root = self.with_record()
+        summary = root.record["positions"][0]["requirement_summary"]
+        summary["pending"] = True
+        summary["not_satisfied"] = False
+        report = run_validator(root, 1)
+        self.assertTrue(any(issue["code"] == "SUMMARY_FIELD_TYPE_INVALID" for issue in report["issues"]))
+
+    def test_core_transferable_pending_requires_consider_and_is_registerable(self):
+        root = self.with_record()
+        position = root.record["positions"][0]
+        requirement = position["requirements"][1]
+        requirement["support"] = "transferable"
+        requirement["conclusion"] = "pending"
+        position["requirement_summary"] = summary_for(position["requirements"])
+        position["decision"]["state"] = "consider"
+        report = run_validator(root, 0)
+        self.assertTrue(report["readiness"]["can_register_selected_position"])
+
+        position["decision"]["state"] = "pending"
+        report = run_validator(root, 1)
+        self.assertTrue(any(issue["code"] == "DECISION_STATE_MISMATCH" for issue in report["issues"]))
+        self.assertFalse(report["readiness"]["can_register_selected_position"])
+
+    def test_core_no_evidence_pending_is_not_consider(self):
+        root = self.with_record()
+        position = root.record["positions"][0]
+        requirement = position["requirements"][1]
+        requirement["support"] = "no_evidence"
+        requirement["candidate_evidence_ids"] = []
+        requirement["conclusion"] = "pending"
+        position["requirement_summary"] = summary_for(position["requirements"])
+        position["decision"]["state"] = "consider"
+        report = run_validator(root, 1)
+        self.assertTrue(any(issue["code"] == "DECISION_STATE_MISMATCH" for issue in report["issues"]))
 
     def test_a1_same_count_different_identity_set(self):
         root = self.with_record()
@@ -503,7 +606,8 @@ class MatchingValidatorTests(unittest.TestCase):
         self.assertEqual(requirement["support"], "transferable")
         self.assertEqual(requirement["conclusion"], "pending")
         self.assertEqual(report["positions"][0]["requirement_summary"]["pending"], 1)
-        self.assertFalse(report["readiness"]["can_register_selected_position"])
+        self.assertEqual(report["readiness"]["selected_position_status"], "registerable")
+        self.assertTrue(report["readiness"]["can_register_selected_position"])
 
 
 if __name__ == "__main__":

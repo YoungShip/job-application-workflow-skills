@@ -18,7 +18,8 @@
 - `checks` 判断结构、目录、证据和决策的一致性；
 - `positions[]` 判断某个岗位是否 `verified`；
 - `readiness.can_generate_full_comparison` 判断能否生成全量比较；
-- `readiness.can_register_selected_position` 判断能否进入主表登记前的人审与用户确认。
+- `readiness.registerable_position_ids` 列出可登记复核的稳定岗位 ID；
+- 传入 `selected_position_id` 后，只有该 ID 在上述列表中且 `can_register_selected_position=true`，才能进入主表登记前的人审与用户确认。
 
 非零报告仍可能包含已核实岗位，可以展示这些岗位；但不能因此宣称全量完成或直接写入主表。
 

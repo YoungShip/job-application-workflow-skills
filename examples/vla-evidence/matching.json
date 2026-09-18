@@ -3,6 +3,7 @@
   "company": "Fixture Robotics",
   "date": "2026-01-01",
   "scope": "Fictional semantic fixture",
+  "selected_position_id": "vla-role",
   "coverage": {
     "capture_status": "complete",
     "official_total": 1,
@@ -82,9 +83,9 @@
         "pending": 1
       },
       "decision": {
-        "state": "pending",
+        "state": "consider",
         "basis": "requirement_summary",
-        "reason": "核心训练能力仍需核实。"
+        "reason": "核心训练能力有可迁移证据，允许用户考虑尝试性申请。"
       }
     }
   ]

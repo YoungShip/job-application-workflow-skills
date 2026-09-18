@@ -28,7 +28,7 @@
     "positions_listed": 1,
     "positions_with_validated_evidence": 1,
     "recommended": 0,
-    "pending": 1,
+    "pending": 0,
     "excluded": 0,
     "out_of_scope_explanations": 0,
     "missing_in_scope_positions": 0,
@@ -45,7 +45,7 @@
         "decision_consistency": "passed"
       },
       "issues": [],
-      "next_step": "resolve_pending_requirements",
+      "next_step": "user_review_before_tracker_registration",
       "requirement_summary": {
         "requirements_total": 1,
         "hard_qualification": 0,
@@ -69,9 +69,14 @@
     "verified_position_ids": [
       "vla-role"
     ],
+    "registerable_position_ids": [
+      "vla-role"
+    ],
+    "selected_position_id": "vla-role",
+    "selected_position_status": "registerable",
     "can_generate_full_comparison": true,
-    "can_register_selected_position": false,
-    "next_step": "generate_comparison_and_review_recommendations",
+    "can_register_selected_position": true,
+    "next_step": "user_review_and_register_selected_position",
     "unresolved": [],
     "message": "可展示单岗核验结果不等于全量比较完成；可进入下一步也不等于语义推荐一定正确"
   },

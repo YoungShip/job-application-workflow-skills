@@ -146,6 +146,8 @@ positions[]
 - `ambiguous` 必须 `pending`；
 - 引用 ID 必须是非空字符串，并存在于同一岗位/版本的共享来源记录；不能把数字或空值强制转换成 ID。
 
+允许的支持关系—结论组合：`direct_support` 允许 `satisfied/pending`；`transferable` 只允许 `pending`；`no_evidence` 只允许 `pending`；`conflict` 允许 `pending/not_satisfied`。因此未解决冲突不能 `satisfied`，可迁移证据也不能自动升级为满足。校验器检查的是状态一致性，不是对语义正确性的自动理解。
+
 ## 6. Requirement summary and decision
 
 `requirement_summary` 必须由 `requirements` 逐项统计，至少包含：
@@ -181,8 +183,8 @@ positions[]
 校验器会重新计算 summary，拒绝手工篡改数量。推荐规则保持简单：
 
 - `recommended`：硬/核心要求均为 `satisfied`，至少一项直接支持，且无冲突；
-- `consider`：没有硬资格待确认/明确不满足，但存在可迁移或核心待确认项；
-- `pending`：硬资格或核心要求仍待确认；
+- `consider`：硬资格全部满足，核心要求存在 `transferable + pending` 的可迁移证据缺口；允许用户在复核后尝试性申请，但不代表满足；
+- `pending`：硬资格未核实，或核心要求只有 `no_evidence/conflict` 等未解决状态；不能因为把同一事实改名为 `consider` 就获得许可；
 - `excluded`：有明确可追溯排除依据；
 - `not_applicable`：仅用于范围外解释记录。
 
@@ -202,6 +204,8 @@ S/A/B/C 不是新格式的必填字段。若保留：S 要求硬/核心全部 sa
 - `issues[]`：带 code、severity、path、position_id、message 和 next_step。
 
 向后兼容保留 `passed/errors/warnings`，但新格式的 `passed=true` 只表示：结构、目录身份、证据引用、决策一致性和完整覆盖声明均达到进入人工复核/登记前的机械条件；它不表示官方来源真实性或语义推荐正确。`mechanical_passed` 单独表示结构/对账/证据/决策四项机械检查是否通过。新调用点应优先读取 `checks`、`coverage` 和 `readiness`；即使旧调用只看退出码，也不能把非零时已列出的单岗结果丢弃。
+
+登记许可必须绑定身份：`readiness.registerable_position_ids` 列出满足全量覆盖和机械校验条件、且决策为 `recommended/consider` 的岗位；若输入 `selected_position_id`，只有它位于该列表时 `can_register_selected_position=true`。缺少选择时为 `selection_required`，不能用全局布尔值替代用户选中的岗位核对。
 
 输入 JSON 损坏时也必须返回完整检查维度：`structure=failed`，目录、证据、决策和覆盖检查为 `not_run`，`readiness.status=blocked`。旧记录则返回所有维度的 `legacy_unverified/unverified`；可读取或可展示不等于满足新标准。
 

@@ -19,6 +19,7 @@ metadata:
 6. 主表只能通过适配器的 `snapshot → preview → apply → read-back` 流程更新，禁止直接编辑 CSV 或按行号定位。
 7. 新研究岗位须经用户选定，并且 `matching.json` 验证通过后，才登记为待投。
 8. 原始目录身份和证据引用必须使用显式、稳定的字符串 ID；校验器报告为 `invalid` 或 `unverifiable` 时，只能展示已核实岗位，不能宣称全量完成。
+9. 主表登记必须把用户选中的稳定岗位 ID传给匹配复核，并确认该 ID 位于 `readiness.registerable_position_ids`；不能只检查全局 `can_register_selected_position`。
 
 ## Choose an entry point
 
@@ -51,7 +52,7 @@ metadata:
 
 ## Register the local tracker
 
-读取 `references/tracker-contract.md`。只有 `matching` 报告的 `readiness.can_register_selected_position=true` 且用户已选定岗位时，才进入主表登记。典型流程：
+读取 `references/tracker-contract.md`。只有用户已选定具体岗位，且该岗位 ID 位于 `matching.readiness.registerable_position_ids`、并满足 `can_register_selected_position=true` 时，才进入主表登记。典型流程：
 
 ```text
 snapshot → build plan with expected_revision → preview → apply → snapshot/read-back → validate

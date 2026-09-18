@@ -18,7 +18,7 @@
 3. 获取完整岗位目录，保存原始快照；不要用首页第一屏或关键词结果冒充全量。
 4. 逐个阅读范围内岗位的完整 JD，记录至少两条原文引文、硬门槛、匹配点和缺口。
 5. 按 schema v2 保存 `raw_catalog` 的显式 ID 提取规则和 `coverage` 状态；每个范围内岗位保存共享 JD/候选人来源，并用 `requirements[]` 做逐项映射。
-6. 运行 `verify-matching.py`，按 `checks`、`positions[]` 和 `readiness` 判断是否可以生成比较记录或登记新岗位；不要只看 `passed`。
+6. 运行 `verify-matching.py`，按 `checks`、`positions[]` 和 `readiness` 判断是否可以生成比较记录或登记新岗位；登记前把用户选择的 `selected_position_id` 传入，并核对它位于 `registerable_position_ids`，不要只看全局布尔值或 `passed`。
 7. 将首选和替代岗位交给用户确认；有限志愿、顺序、投后修改限制和截止日必须显著呈现。
 
 ## 3. 登记本地投递主表

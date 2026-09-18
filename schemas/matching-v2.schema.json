@@ -9,6 +9,7 @@
     "company": {"type": "string", "minLength": 1},
     "date": {"type": "string", "minLength": 1},
     "scope": {"type": "string", "minLength": 1},
+    "selected_position_id": {"type": "string", "minLength": 1},
     "coverage": {"$ref": "#/$defs/coverage"},
     "raw_catalog": {"$ref": "#/$defs/rawCatalog"},
     "catalog_index": {
@@ -132,6 +133,24 @@
         "conclusion": {"enum": ["satisfied", "not_satisfied", "pending"]},
         "judgment": {"type": "string", "minLength": 1}
       },
+      "allOf": [
+        {
+          "if": {"properties": {"support": {"const": "direct_support"}}},
+          "then": {"properties": {"conclusion": {"enum": ["satisfied", "pending"]}}}
+        },
+        {
+          "if": {"properties": {"support": {"const": "transferable"}}},
+          "then": {"properties": {"conclusion": {"const": "pending"}}}
+        },
+        {
+          "if": {"properties": {"support": {"const": "no_evidence"}}},
+          "then": {"properties": {"conclusion": {"const": "pending"}}}
+        },
+        {
+          "if": {"properties": {"support": {"const": "conflict"}}},
+          "then": {"properties": {"conclusion": {"enum": ["pending", "not_satisfied"]}}}
+        }
+      ],
       "additionalProperties": true
     },
     "decision": {

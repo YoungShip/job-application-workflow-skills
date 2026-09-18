@@ -2,7 +2,9 @@
 
 The Skill is independent of any particular CSV implementation. A local adapter must expose equivalent operations and preserve optimistic concurrency.
 
-Before registering a newly researched role, the caller should require the matching report to say `readiness.can_register_selected_position=true` and still obtain the user's explicit role selection. A report may contain verified individual positions while the overall directory is partial; those positions can be displayed, but they must not be treated as a complete research batch.
+Before registering a newly researched role, the caller must pass the user-selected stable position ID and verify that it is contained in `readiness.registerable_position_ids`. `can_register_selected_position` is only meaningful when the same `selected_position_id` was supplied; never use a global true value to register a different role. A report may contain verified individual positions while the overall directory is partial; those positions can be displayed, but they must not be treated as a complete research batch.
+
+Decision rule for registration: `recommended` requires all hard/core requirements satisfied; `consider` requires hard qualifications satisfied and a core `transferable + pending` gap, which permits user-reviewed trial application; `pending` remains non-registerable when hard qualifications are unresolved or core evidence is absent/conflicted. These states are derived from requirements, not selected by label to change permission.
 
 ## Read and write sequence
 
