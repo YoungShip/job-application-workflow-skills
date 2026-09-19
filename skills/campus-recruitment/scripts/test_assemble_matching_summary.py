@@ -129,6 +129,51 @@ class AssembleMatchingSummaryTests(unittest.TestCase):
                 self.assertTrue(all(type(value) is int for value in assembled["positions"][0]["requirement_summary"].values()))
                 self.assertTrue(changed)
 
+    def test_equal_valued_boolean_counts_are_rebuilt_as_integers(self):
+        # 审阅 5.1：从合法记录出发，只把数值 0/1 的计数换成对应布尔值。
+        # Python 中 False == 0、True == 1，因此整体相等比较会漏掉这种替换，
+        # 必须逐字段按 type(v) is int 核对，否则布尔计数被静默保留。
+        requirements = [requirement("r1", "hard_qualification", "direct_support", "satisfied")]
+        expected_summary = MODULE.summary(requirements)
+        # 前置条件：该记录的派生计数确实只由 0/1 组成，才能构造"等值布尔"反例
+        self.assertTrue(all(value in (0, 1) for value in expected_summary.values()))
+        self.assertEqual(expected_summary["hard_qualification"], 1)
+        self.assertEqual(expected_summary["core_capability"], 0)
+
+        boolean_summary = {key: bool(value) for key, value in expected_summary.items()}
+        # 确认这些布尔值与整数计数相等（正是旧实现漏判的原因）
+        self.assertEqual(boolean_summary, expected_summary)
+
+        record = {
+            "positions": [
+                {
+                    "requirements": requirements,
+                    "requirement_summary": json.loads(json.dumps(boolean_summary)),
+                    "title": "Fixture title",
+                    "decision": {"state": "recommended", "basis": "requirement_summary", "reason": "fixture"},
+                }
+            ]
+        }
+        original = json.loads(json.dumps(record))
+
+        assembled, errors, changed = MODULE.assemble(record)
+
+        self.assertEqual(errors, [])
+        rebuilt = assembled["positions"][0]["requirement_summary"]
+        # 必须重建为整数
+        self.assertTrue(
+            all(type(value) is int for value in rebuilt.values()),
+            f"计数必须重建为整数，实际类型：{ {k: type(v).__name__ for k, v in rebuilt.items()} }",
+        )
+        self.assertEqual(rebuilt, expected_summary)
+        # 差异必须被记录（不能静默）
+        self.assertTrue(changed, "等值布尔替换必须产生 changed_paths")
+        self.assertTrue(any("requirement_summary" in path for path in changed))
+        # 语义字段原样保留，原始记录不被改动
+        self.assertEqual(assembled["positions"][0]["decision"], original["positions"][0]["decision"])
+        self.assertEqual(assembled["positions"][0]["title"], "Fixture title")
+        self.assertEqual(record, original, "原始记录不得被就地修改")
+
     def test_cli_writes_structured_diagnostics_for_invalid_requirement(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

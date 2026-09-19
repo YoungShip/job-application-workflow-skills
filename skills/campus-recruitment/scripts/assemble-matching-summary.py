@@ -129,22 +129,25 @@ def assemble_detailed(record: Any) -> tuple[Any, list[str], list[str], list[dict
             )
             position["requirement_summary"] = expected
             continue
-        if supplied != expected:
-            for field in expected:
-                actual = supplied.get(field)
-                if type(actual) is not int or actual != expected[field]:
-                    changed_paths.append(f"positions[{index}].requirement_summary.{field}")
-                    summary_diagnostics.append(
-                        {
-                            "path": f"positions[{index}].requirement_summary.{field}",
-                            "reason": "derived count missing, wrong type, or wrong value; rebuilt from requirements",
-                            "old_type": type(actual).__name__,
-                            "old_value": actual,
-                            "expected_value": expected[field],
-                            "strategy": "replace_derived_field",
-                        }
-                    )
-            position["requirement_summary"] = expected
+        # 逐字段无条件核对，不能先比较整体相等再检查类型：
+        # Python 中 False == 0、True == 1，若只把数值 0/1 换成等值布尔，
+        # supplied != expected 会判定为相等而整体跳过，布尔计数就被静默保留。
+        for field in expected:
+            actual = supplied.get(field)
+            if type(actual) is not int or actual != expected[field]:
+                changed_paths.append(f"positions[{index}].requirement_summary.{field}")
+                summary_diagnostics.append(
+                    {
+                        "path": f"positions[{index}].requirement_summary.{field}",
+                        "reason": "derived count missing, wrong type, or wrong value; rebuilt from requirements",
+                        "old_type": type(actual).__name__,
+                        "old_value": actual,
+                        "expected_value": expected[field],
+                        "strategy": "replace_derived_field",
+                    }
+                )
+        # 始终以从 requirements 重建的计数为准，保留其余字段差异与原始记录
+        position["requirement_summary"] = expected
     return assembled, [], changed_paths, summary_diagnostics
 
 
