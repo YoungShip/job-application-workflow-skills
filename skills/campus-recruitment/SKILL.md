@@ -40,7 +40,7 @@ metadata:
 5. **逐岗读 JD**：对所有范围内岗位完整阅读职责和要求；在共享 `jd_source` 中保存岗位 ID、来源 URL、读取时间、本地正文快照和可定位原文引文。
 6. **映射候选人证据**：每条要求写入 `requirements[]`，明确 `hard_qualification`/`core_capability`/`plus`/`ambiguous` 类别、JD 引文 ID、候选人档案版本与证据 ID、`direct_support`/`transferable`/`no_evidence`/`conflict` 支持关系，以及 `satisfied`/`not_satisfied`/`pending` 结论。无证据不能写成满足；语义不明确不能升级为硬门槛。
 7. **由逐项结果汇总**：计算 `requirement_summary`，再生成 `decision`；`core_total` 固定等于 `hard_qualification + core_capability`，不包含 `plus` 或 `ambiguous`。每组计数都必须从 `requirements[]` 逐项统计，不能先写 S/A/B/C 或自由百分比再补理由。S/A/B/C 仅是可选辅助标签，规则见 `references/matching-record.md`。
-8. **验证再报告**：模型输出必须先原样保存为 UTF-8 raw JSON，再通过 `scripts/run-matching-pipeline.py --raw <raw.json> --run-dir <new-run-dir>`。该入口只从合法 `requirements[]` 派生 `requirement_summary`，保留 raw、组装结果、字段差异和诊断，然后调用当前 `scripts/verify-matching.py`。正式消费者只读取组装并校验后的记录及 `checks`/`readiness`；不能继续把 raw 当作最终记录。非零报告仍可包含已核实单岗，不能直接宣称全量完成。
+8. **验证再报告**：模型输出必须先原样保存为 UTF-8 raw JSON，再通过 `scripts/run-matching-pipeline.py --raw <raw.json> --run-dir <new-run-dir>`。该入口只从合法 `requirements[]` 派生 `requirement_summary`，保留 raw、组装结果、字段差异和诊断，然后调用当前 `scripts/verify-matching.py`。正式消费者只读取组装并校验后的记录及 `checks`/`readiness`；不能继续把 raw 当作最终记录。`pipeline-result.json.execution_status=completed` 只表示流程已执行完，必须另外读取 `verification_status`、`readiness_status`、`mechanical_passed` 和内层报告；不能把兼容字段 `status=completed` 当成验证通过。非零报告仍可包含已核实单岗，不能直接宣称全量完成。
 9. **输出可决策结论**：优先展示核心要求总数、直接支持、可迁移、待确认和明确不满足数量；给出首选、替代、排除清单、影响选择的规则、未核事实和需要用户确认的岗位。
 
 关键词搜索可以定位岗位，但不能证明全量覆盖；如果不得不使用关键词，`coverage.capture_status` 使用 `partial` 或 `unknown`，明确写“非全量，可能遗漏”。原始目录 ID 提取必须在 `raw_catalog` 中显式声明，无法提取时保持覆盖待核验，不得按标题猜身份。

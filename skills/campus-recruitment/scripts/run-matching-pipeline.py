@@ -173,6 +173,10 @@ def main() -> int:
     if assemble_result.returncode != 0:
         result = {
             "status": "assembly_failed",
+            "execution_status": "assembly_failed",
+            "verification_status": "not_run",
+            "readiness_status": "blocked",
+            "mechanical_passed": False,
             "assembler_exit_code": assemble_result.returncode,
             "assembler_elapsed_ms": assemble_ms,
             "raw_verification": raw_validation,
@@ -191,6 +195,10 @@ def main() -> int:
     report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.exists() else None
     result = {
         "status": "completed",
+        "execution_status": "completed",
+        "verification_status": (report or {}).get("overall_status", "missing_report"),
+        "readiness_status": (report or {}).get("readiness", {}).get("status", "unknown"),
+        "mechanical_passed": (report or {}).get("mechanical_passed") is True,
         "assembler_exit_code": assemble_result.returncode,
         "assembler_elapsed_ms": assemble_ms,
         "verifier_exit_code": verify_result.returncode,

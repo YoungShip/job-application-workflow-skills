@@ -20,6 +20,7 @@ from test_verify_matching import valid_record
 
 ROOT = Path(__file__).resolve().parents[3]
 MATCHING_VALIDATOR = Path(__file__).with_name("verify-matching.py")
+MATCHING_PIPELINE = Path(__file__).with_name("run-matching-pipeline.py")
 
 ALLOWED_STATUSES = {
     "Pending",
@@ -184,6 +185,29 @@ class WorkflowContractTests(unittest.TestCase):
         results = [{"job_id": "job-1", "verified": True, "change_id": "old-change", "error": None}]
         self.assertTrue(validate_ack(results, {"job-1": "new-change"}))
         self.assertTrue(validate_ack([], {"job-1": "new-change"}))
+
+
+    def test_pipeline_separates_execution_from_partial_verification(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            matching = valid_record(root)
+            matching["coverage"]["human_attested"] = False
+            raw = root / "raw.json"
+            raw.write_text(json.dumps(matching, ensure_ascii=False), encoding="utf-8")
+            run_dir = root / "run"
+            process = subprocess.run(
+                [sys.executable, "-X", "utf8", str(MATCHING_PIPELINE), "--raw", str(raw), "--run-dir", str(run_dir)],
+                capture_output=True,
+            )
+            output = process.stdout.decode("utf-8", errors="replace") + process.stderr.decode("utf-8", errors="replace")
+            self.assertEqual(process.returncode, 0, output)
+            result = json.loads((run_dir / "pipeline-result.json").read_text(encoding="utf-8"))
+            self.assertEqual(result["status"], "completed")
+            self.assertEqual(result["execution_status"], "completed")
+            self.assertEqual(result["verification_status"], "partial")
+            self.assertEqual(result["readiness_status"], "partial")
+            self.assertTrue(result["mechanical_passed"])
+            self.assertNotEqual(result["verifier_exit_code"], 0)
 
 
 if __name__ == "__main__":

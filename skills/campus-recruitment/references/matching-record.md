@@ -213,7 +213,7 @@ Here `core_total=3` is `1` hard qualification plus `2` core capabilities; the on
 }
 ```
 
-正式执行路径为：模型输出 → 原样保存 raw → `scripts/run-matching-pipeline.py` 组装派生汇总 → `scripts/verify-matching.py` → 按 `checks`/`readiness` 消费正式结果。校验器会重新计算 summary，拒绝手工篡改数量；raw 仅用于审计，不是最终消费记录。推荐规则保持简单：
+正式执行路径为：模型输出 → 原样保存 raw → `scripts/run-matching-pipeline.py` 组装派生汇总 → `scripts/verify-matching.py` → 按 `checks`/`readiness` 消费正式结果。校验器会重新计算 summary，拒绝手工篡改数量；raw 仅用于审计，不是最终消费记录。pipeline 的 `execution_status=completed`（兼容字段仍为 `status=completed`）只表示子流程执行结束，不表示验证通过；消费者必须读取 `verification_status`、`readiness_status`、`mechanical_passed` 与完整内层报告。推荐规则保持简单：
 
 - `recommended`：硬/核心要求均为 `satisfied`，至少一项直接支持，且无冲突；
 - `consider`：硬资格全部满足，核心要求存在 `transferable + pending` 的可迁移证据缺口；允许用户在复核后尝试性申请，但不代表满足；
