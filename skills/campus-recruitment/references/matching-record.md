@@ -150,6 +150,17 @@ positions[]
 
 ## 6. Requirement summary and decision
 
+### Deterministic count semantics
+
+`requirement_summary` is derived from `requirements[]`; the model must not invent, omit, or hand-edit these counts. The category counts are mutually exclusive and must satisfy:
+
+- `requirements_total` = the number of `requirements[]` items;
+- `hard_qualification`, `core_capability`, `plus`, and `ambiguous` count their exact `category` values, and their sum equals `requirements_total`;
+- `core_total` = `hard_qualification + core_capability`; it excludes `plus` and `ambiguous`;
+- `direct_support`, `transferable`, `no_evidence`, and `conflict` count exact `support` values, and their sum equals `requirements_total`;
+- `satisfied`, `not_satisfied`, and `pending` count exact `conclusion` values, and their sum equals `requirements_total`;
+- every count is an integer in `0..requirements_total`.
+
 `requirement_summary` 必须由 `requirements` 逐项统计，至少包含：
 
 ```json
@@ -170,6 +181,28 @@ positions[]
 }
 ```
 
+Example with one hard qualification, two core capabilities, and one plus item:
+
+```json
+{
+  "requirements_total": 4,
+  "hard_qualification": 1,
+  "core_capability": 2,
+  "plus": 1,
+  "ambiguous": 0,
+  "core_total": 3,
+  "direct_support": 2,
+  "transferable": 1,
+  "no_evidence": 1,
+  "conflict": 0,
+  "satisfied": 2,
+  "not_satisfied": 0,
+  "pending": 2
+}
+```
+
+Here `core_total=3` is `1` hard qualification plus `2` core capabilities; the one `plus` item is not included.
+
 `decision` 必须包含：
 
 ```json
@@ -180,7 +213,7 @@ positions[]
 }
 ```
 
-校验器会重新计算 summary，拒绝手工篡改数量。推荐规则保持简单：
+正式执行路径为：模型输出 → 原样保存 raw → `scripts/run-matching-pipeline.py` 组装派生汇总 → `scripts/verify-matching.py` → 按 `checks`/`readiness` 消费正式结果。校验器会重新计算 summary，拒绝手工篡改数量；raw 仅用于审计，不是最终消费记录。推荐规则保持简单：
 
 - `recommended`：硬/核心要求均为 `satisfied`，至少一项直接支持，且无冲突；
 - `consider`：硬资格全部满足，核心要求存在 `transferable + pending` 的可迁移证据缺口；允许用户在复核后尝试性申请，但不代表满足；
