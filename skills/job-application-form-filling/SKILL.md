@@ -42,7 +42,7 @@ metadata:
 
 ### 2. Identify the ATS family
 
-先读 `references/ats-families.md`，再读当前站点的 `references/site-knowledge.md`。已有站点经验只作为操作提示，仍需按当前页面读回；未知站点按 `references/fill-protocol.md` 探索并把已验证差异增量记录下来。
+先读 `references/ats-families.md`，再读当前站点的 `references/site-knowledge.md`。若运行环境提供本地站点覆盖层/陈旧检查器，先检查其 freshness；只有 fresh + verified 经验可直接作为操作提示，stale/candidate/historical 必须现场复核。未知站点按 `references/fill-protocol.md` 探索并把差异先作为候选观察记录，验证后再晋级。
 
 ### 3. Open and upload
 
@@ -73,7 +73,7 @@ metadata:
 
 ### 7. Learn
 
-将确定有效的站点控件、上传入口、日期行为、复用规律和可复现坑位增量写入 `references/site-knowledge.md`。失败只有在原因可复用时才记录；一次性坐标尝试不固化为通用规则。
+将确定有效的站点控件、上传入口、日期行为、复用规律和可复现坑位增量沉淀。租户/批次/账号限定经验优先写本地私有覆盖层，使用 `knowledge_status`、`last_verified`、`stale_after_days` 管理生命周期；失败或单次新发现先标 candidate，取得成功读回或服务端证据后才晋级 verified。一次性坐标尝试、猜测和仅 UI 显示不固化。只有去除个人信息后、跨独立站点重复验证的控件级规律才允许进入公共 `references/site-knowledge.md`。
 
 ## References
 

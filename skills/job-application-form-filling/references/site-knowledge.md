@@ -1,6 +1,6 @@
 # Site knowledge base
 
-本文件只记录可复用的站点差异，不记录候选人值、岗位 ID、真实申请日期、账号信息或材料原文。新条目应注明验证范围和最近验证日期；过期或改版条目应标记待复核。
+本文件只记录可复用的站点差异，不记录候选人值、岗位 ID、真实申请日期、账号信息或材料原文。租户/批次/账号限定观察应留在本地私有覆盖层，不直接进入本文件。私有观察推荐使用 `knowledge_status: candidate|verified|historical`、`last_verified: YYYY-MM-DD`、`stale_after_days: N`；只有 fresh + verified 可直接作为操作提示，其他状态必须现场复核。公共条目应是去除个人信息后、跨独立站点重复验证的控件级规律；改版或反例出现时降级为待复核。
 
 ## Feishu-style custom form
 
