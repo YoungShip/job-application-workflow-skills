@@ -6,6 +6,8 @@ Before registering a newly researched role, the caller must pass the user-select
 
 Decision rule for registration: `recommended` requires all hard/core requirements satisfied; `consider` requires hard qualifications satisfied and a core `transferable + pending` gap, which permits user-reviewed trial application; `pending` remains non-registerable when hard qualifications are unresolved or core evidence is absent/conflicted. These states are derived from requirements, not selected by label to change permission.
 
+For human readability, copy the verified pipeline human-summary.json values into match_grade and match_estimate when registering a researched job. match_estimate is an evidence-match range, not a hiring probability; neither display field grants registration permission.
+
 ## Read and write sequence
 
 ```text

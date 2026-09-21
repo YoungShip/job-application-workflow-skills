@@ -22,6 +22,7 @@ from pathlib import Path
 SCRIPT_DIR = Path(__file__).resolve().parent
 ASSEMBLER = SCRIPT_DIR / "assemble-matching-summary.py"
 VERIFIER = SCRIPT_DIR / "verify-matching.py"
+DISPLAY = SCRIPT_DIR / "derive_matching_display.py"
 
 
 def sha256(path: Path) -> str:
@@ -137,6 +138,8 @@ def main() -> int:
                 "assembler_sha256": sha256(ASSEMBLER),
                 "verifier": str(VERIFIER),
                 "verifier_sha256": sha256(VERIFIER),
+                "display": str(DISPLAY),
+                "display_sha256": sha256(DISPLAY),
                 "raw_source": str(raw),
                 "raw_sha256": hashlib.sha256(raw_bytes).hexdigest(),
                 "utf8_strict": True,
@@ -193,6 +196,11 @@ def main() -> int:
     capture_process(verify_result, run_dir / "verifier.raw.log", run_dir / "verifier.log")
     report_path = assembled.with_name(assembled.stem + "-verification.json")
     report = json.loads(report_path.read_text(encoding="utf-8")) if report_path.exists() else None
+    human_summary_path = run_dir / "human-summary.json"
+    display_command = [sys.executable, "-X", "utf8", str(DISPLAY), str(assembled), str(human_summary_path)]
+    display_result = subprocess.run(display_command, stdin=subprocess.DEVNULL, capture_output=True)
+    capture_process(display_result, run_dir / "display.raw.log", run_dir / "display.log")
+    human_summary = json.loads(human_summary_path.read_text(encoding="utf-8")) if human_summary_path.exists() else None
     result = {
         "status": "completed",
         "execution_status": "completed",
@@ -205,6 +213,9 @@ def main() -> int:
         "verifier_elapsed_ms": verify_ms,
         "raw_verification": raw_validation,
         "assembled_verification": report,
+        "human_summary_status": "generated" if display_result.returncode == 0 and human_summary is not None else "failed",
+        "human_summary_path": str(human_summary_path),
+        "human_summary": human_summary,
         "raw_preserved": raw_copy.exists(),
         "assembled_path": str(assembled),
     }

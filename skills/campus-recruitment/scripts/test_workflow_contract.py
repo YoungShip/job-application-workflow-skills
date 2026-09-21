@@ -208,6 +208,8 @@ class WorkflowContractTests(unittest.TestCase):
             self.assertEqual(result["readiness_status"], "partial")
             self.assertTrue(result["mechanical_passed"])
             self.assertNotEqual(result["verifier_exit_code"], 0)
+            self.assertEqual(result["human_summary_status"], "generated")
+            self.assertTrue((run_dir / "human-summary.json").is_file())
 
 
 if __name__ == "__main__":

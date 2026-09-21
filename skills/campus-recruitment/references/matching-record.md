@@ -223,7 +223,12 @@ Here `core_total=3` is `1` hard qualification plus `2` core capabilities; the on
 
 多要求组合按以下优先级处理：先检查硬资格；硬资格 `pending/not_satisfied` 时不能 `recommended/consider`。再检查核心要求：任一核心 `not_satisfied` 或 `conflict` 时，`pending` 可以如实保存但不可登记，`consider`/`recommended` 均阻断；只有硬资格已满足、核心缺口全部是 `transferable + pending` 时，才允许 `consider` 进入用户复核后的尝试性登记。`no_evidence` 或 `conflict` 不能被另一项可迁移证据抵消。
 
-S/A/B/C 不是新格式的必填字段。若保留：S 要求硬/核心全部 satisfied 且有直接支持；A 不得有硬资格待确认/不满足或核心明确不满足；B 不能直接标 `recommended`；C 必须有硬/核心待确认或明确不满足依据。等级仍是辅助标签，不替代逐项汇总。
+S/A/B/C 不作为 raw semantic record 的许可字段，但**用户可读报告必须生成派生等级与证据匹配度**。derive_matching_display.py 从已核实 requirements[] 确定性计算：
+- 权重：hard_qualification/core_capability=3，plus/ambiguous=1；
+- 单项证据系数：direct_support+satisfied=1.0、direct_support+pending=0.75、transferable+pending=0.55、conflict+pending=0.25、conflict+not_satisfied=0、no_evidence+pending=0；
+- 得分只表示**证据匹配度，不是录用率**，对外以 5% 区间显示；
+- excluded=true 的岗位展示等级固定为 C；S 仅限 recommended 且硬/核心全满足；A/B 再按得分和硬/核心失败门确定。
+派生等级和区间可写入主表 match_grade/match_estimate 方便阅读，但**不能反向修改 decision，也不能绕过 readiness 登记门**。
 
 ## 7. Report semantics
 

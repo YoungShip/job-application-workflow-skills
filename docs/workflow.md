@@ -19,7 +19,8 @@
 4. 逐个阅读范围内岗位的完整 JD，记录至少两条原文引文、硬门槛、匹配点和缺口。
 5. 按 schema v2 保存 `raw_catalog` 的显式 ID 提取规则和 `coverage` 状态；每个范围内岗位保存共享 JD/候选人来源，并用 `requirements[]` 做逐项映射。
 6. 运行 `verify-matching.py`，按 `checks`、`positions[]` 和 `readiness` 判断是否可以生成比较记录或登记新岗位；登记前把用户选择的 `selected_position_id` 传入，并核对它位于 `registerable_position_ids`，不要只看全局布尔值或 `passed`。
-7. 将首选和替代岗位交给用户确认；有限志愿、顺序、投后修改限制和截止日必须显著呈现。
+7. pipeline 验证后生成 human-summary.json；向用户展示岗位比较时必须包含 **S/A/B/C + 证据匹配度区间（非录用率）+ decision + 是否可登记 + 关键缺口**，不能只给机器状态。
+8. 将首选和替代岗位交给用户确认；有限志愿、顺序、投后修改限制和截止日必须显著呈现。
 
 ## 3. 登记本地投递主表
 
