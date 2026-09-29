@@ -45,6 +45,10 @@ metadata:
 
 关键词搜索可以定位岗位，但不能证明全量覆盖；如果不得不使用关键词，`coverage.capture_status` 使用 `partial` 或 `unknown`，明确写“非全量，可能遗漏”。原始目录 ID 提取必须在 `raw_catalog` 中显式声明，无法提取时保持覆盖待核验，不得按标题猜身份。
 
+### 已配置的匹配 Agent
+
+工作区已配置匹配 Agent 适配器时，A/B 中需要证据匹配的岗位默认经适配器执行，调用与交回规范见 [agent-adapter.md](references/agent-adapter.md)。它负责逐项证据匹配及记录组装；目录抓取、来源核对、现行规则、额度/志愿及最终选岗仍由本 Skill 完成。C/D 不为接入 Agent 而重跑不必要的匹配。
+
 ## B/C/D shortcuts
 
 - B 只验证本次变化；推荐顺序变化时，重新读取受影响岗位的完整 JD，并保留原报告和快照。
@@ -70,4 +74,5 @@ snapshot → build plan with expected_revision → preview → apply → snapsho
 - 边界案例：[edge-cases.md](references/edge-cases.md)
 - 主表适配器接口：[tracker-contract.md](references/tracker-contract.md)
 - 主表最小入口：[tracker-update.md](references/tracker-update.md)
+- 已配置工作区的 Agent 调用与结果交回：[agent-adapter.md](references/agent-adapter.md)
 - 结构化校验：`scripts/verify-matching.py`
