@@ -4,7 +4,7 @@
 
 ## 启用与降级
 
-若当前工作区含 JobHuntBot/agent/pyproject.toml，使用该工作区的 jobmatch research 入口；首次使用先运行 jobmatch doctor，确认母表、校验器和模型已配置。模型 Key 只从私有配置加载。
+若当前工作区含 CareerWorkbench/agent/pyproject.toml，使用该工作区的 jobmatch research 入口；首次使用先运行 jobmatch doctor，确认母表、校验器和模型已配置。模型 Key 只从私有配置加载。
 
 其他适配器采用等价的输入输出契约即可。未配置适配器时沿用本 Skill 原逐项匹配流程，无需安装新工具、修改账号或要求用户提供已有凭据。接口失败或输出不合法时保留运行目录和错误；有限重试耗尽后报告该岗待处理，其他可独立核实的事实继续完成。不得把失败改成“不适合”，或用旧成功结果冒充当前运行。
 
@@ -12,7 +12,7 @@
 
 先完成本 Skill 的来源与范围核查，再把原始目录、完整 JD、规则观察保存到同一个私有研究目录。JSON 使用严格 UTF-8；所有岗位使用官方稳定 ID，不能靠岗位名匹配。
 
-JobHuntBot 请求 schema_version=1，字段如下：
+CareerWorkbench 请求 schema_version=1，字段如下：
 
 | 字段 | 内容 |
 |---|---|
@@ -38,7 +38,7 @@ observations.topic 可为 cohort、employment_type、city、open_status、applic
 
 ## 调用
 
-在已配置的 JobHuntBot/agent 目录运行：
+在已配置的 CareerWorkbench/agent 目录运行：
 
     uv run jobmatch research --request "<私有研究目录>/research-request.json" --provider cpa
 
