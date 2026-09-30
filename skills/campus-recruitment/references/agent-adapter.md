@@ -68,3 +68,9 @@ Agent 提供的语义判断可以复核，不能为了获得更好等级删除�
 先按主 Skill 输出当前范围的已核实结果、未核实条件和选项，等用户选定岗位。匹配结果不是投递授权。
 
 用户已明确选择后，才把稳定 ID 带入新一轮匹配复核，检查该 ID 位于 registerable_position_ids 且 can_register_selected_position=true。其后的 snapshot → preview → apply → read-back 及 OfferNotes 同步完全沿用原协议。pending、范围不完整或来源不足时保持相应阻断；已有投递事实不回滚。
+
+## 资料更新后的同步检查
+
+已配置 CareerWorkbench 时，简历或母表更新后先运行 jobmatch check-materials；doctor 也返回资料核查状态。新增简历项目要有母表结构化项目、对应分栏文本与当前模型证据，不能仅有 PDF 或自我介绍。错误时先同步母表并运行其资料生成器，再核验；不得把资料错误判成岗位不匹配。
+
+旧匹配用于新选岗前，可用 check-materials --matching-file 核对冻结事实版本。stale 或 unknown 要按当前事实复核，原结果和历史投递保留。未配置该工具的工作区按相同原则手工核对，不要求安装。
