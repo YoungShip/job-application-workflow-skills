@@ -1,6 +1,6 @@
 # Job Application Workflow Skills
 
-> **维护说明（2026-10-07）**：这三个 Skill 的日常维护已移到作者的 CareerWorkbench 项目（私有），本仓库是其中 `skills/` 的公开发布版，在有重要改进时同步更新。发布前会去除个人信息，以及只适用于某个公司、批次或账号的经验，只保留跨站点验证过的通用规律。
+> **维护说明（2026-10-07）**：这三个 Skill 的日常维护已移到作者的 [CareerWorkbench](https://github.com/YoungShip/CareerWorkbench) 项目，最新版本见其中的 [`skills/`](https://github.com/YoungShip/CareerWorkbench/tree/main/skills)；本仓库是独立发布版，在有重要改进时同步更新。发布前会去除个人信息，以及只适用于某个公司、批次或账号的经验，只保留跨站点验证过的通用规律。
 
 一套可迁移的求职工作流 Skill：
 
