@@ -129,6 +129,8 @@ positions[]
 - `plus`：加分项、优先项、nice-to-have；
 - `ambiguous`：原文语义不足以可靠分类，必须保持待确认。
 
+未给具体任务、经验或验收标准的“兴趣、好奇心、自驱力、学习快、沟通高效”等纯个人特质，保留为 `ambiguous + pending`，由面试核实。同句中的需求分析、具体问题定位、方案设计与交付等可观察能力须单独保留为 `core_capability`。不得额外要求 JD 没写的企业级规模或完全独立手写；AI 辅助经历仍按已确认职责与边界逐项判断。
+
 类别必须有 `category_basis_quote_ids`。不能把“优先/加分”自行升级为硬门槛。
 
 ### Conclusion versus support

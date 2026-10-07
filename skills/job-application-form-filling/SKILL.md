@@ -23,7 +23,7 @@ metadata:
 
 ## Browser channel and remote takeover
 
-通道优先级按当前运行时能力选择：①内置浏览器 → ②已授权日常 Chrome 插件 → ③A Playwright 专用持久化 profile → ③B Raw CDP 专用通道。前一级能可靠完成且可读回时不升级。
+通道优先级按当前运行时能力选择：①已授权日常 Chrome 插件 → ②内置浏览器 → ③A Playwright 专用持久化 profile → ③B Raw CDP 专用通道。前一级能可靠完成且可读回时不升级。
 
 - **③A Playwright**：适合 ATS UI。优先 data-cy、label、role、可见文本和真实 option；利用 actionability/auto-wait 拒绝被遮挡或不可交互的元素。必要的组件级 JavaScript 只针对已经精确定位的目标，并在操作后读回。
 - **③B Raw CDP**：适合 OfferNotes/API 级精确同步和诊断。不得因为能执行 Runtime.evaluate 就把它当成普通网申默认方案。
@@ -70,6 +70,12 @@ metadata:
 ### 6. Handoff or submit
 
 未获提交授权时，保留页面并交付 URL、岗位、简历版本、关键字段核对结果和未完成项。获本次提交授权时，也必须先完成审计；提交前还要核项目级志愿/顺序/额度等隐藏门。执行提交后检查 HTTP 状态、业务 code/msg 和账号投递记录：业务失败时先确认没有生成记录，再定位并补齐允许自动处理的项目级门，最多做必要的有界重试；只有成功页、账号记录、确认邮件或用户明确确认才可登记为已提交。
+
+**登记 Submitted 前的硬性收尾（不询问、直接执行）**：按 `references/application-materials.md` 把 `materials.json`、`official-jd.txt`、`field-audit.json`、`submission-evidence.json` 落盘到 `private/applications/<job_id>/<run-id>/`——这是审计的第5步产出与提交证据的最终归宿，属本地私有操作，不属于任何需要用户确认的边界。敏感字段只存布尔比对结果。**快照缺失不得登记 Submitted**；首次提交尝试（含失败/验证码中断）也要记录其证据与过程。
+
+**投后交付（preauthorized/autonomous 模式必做，不等待用户索要）**：提交完成并核验后，在回复中主动给出**全字段提交内容清单**——每个字段的最终提交值、与档案的一致性结论、未填项及原因、解析偏差及修正记录；敏感字段（证件号等）打码。review 模式的交回天然包含此清单。本人复核指出偏差时，按第 7 步把失败教训写回工作流信息层，确保同类错误下次不犯。
+
+**额度余量反馈（不替本人做扩选决定）**：若门户额度在本次投递后仍有余量，且该公司存在其他在招、可匹配的岗位，主动向本人反馈余量数字与候选方向，提示可走 campus-recruitment 补研究后扩选；未经本人选定不得自行登记或提交任何新岗位。
 
 ### 7. Learn
 
